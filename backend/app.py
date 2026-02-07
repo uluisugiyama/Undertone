@@ -1,10 +1,12 @@
 from flask import Flask, jsonify, request
 from flask_migrate import Migrate
+from flask_cors import CORS
 from models import db, Song
 from music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
 
 app = Flask(__name__)
+CORS(app) # Enable CORS for all routes
 
 # Basic SQLite configuration
 basedir = os.path.abspath(os.path.dirname(__file__))

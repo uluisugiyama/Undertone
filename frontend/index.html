@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undertone - Objective Search POC</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        .filter-group { margin-bottom: 10px; }
+        label { display: inline-block; width: 100px; }
+        #results { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }
+        .song-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Undertone - Objective Search</h1>
+    
+    <div class="filter-group">
+        <label for="genre">Genre:</label>
+        <select id="genre">
+            <option value="">Any</option>
+            <option value="Punk Rock">Punk Rock</option>
+            <option value="Metalcore">Metalcore</option>
+            <option value="Synthpop">Synthpop</option>
+            <option value="Techno">Techno</option>
+            <option value="Ambient">Ambient</option>
+            <option value="Grunge">Grunge</option>
+            <option value="Lo-fi">Lo-fi</option>
+            <option value="Trap">Trap</option>
+            <option value="R&B">R&B</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="tempo">Tempo:</label>
+        <select id="tempo">
+            <option value="any">Any</option>
+            <option value="fast">Fast (>120 BPM)</option>
+            <option value="slow">Slow (<=120 BPM)</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="loudness">Loudness:</label>
+        <select id="loudness">
+            <option value="any">Any</option>
+            <option value="heavy">Heavy (>-10dB)</option>
+            <option value="mellow">Mellow (<=-10dB)</option>
+        </select>
+    </div>
+
+    <button id="search-btn">Search Songs</button>
+
+    <div id="results">
+        <h3>Results</h3>
+        <div id="results-list"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

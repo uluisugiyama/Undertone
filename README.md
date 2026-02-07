@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="https://img.icons8.com/isometric/512/music.png" width="128" height="128" alt="Undertone Logo" />
   <br />
   <h1>🌊 U N D E R T O N E</h1>
   <h3>Intent-Driven Music Discovery Engine</h3>
