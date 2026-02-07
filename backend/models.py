@@ -16,21 +16,35 @@ class Song(db.Model):
     __tablename__ = 'songs'
 
     id = db.Column(db.Integer, primary_key=True)
+    artist = db.Column(db.String(255), nullable=True) # New
+    title = db.Column(db.String(255), nullable=True) # New
     bpm = db.Column(db.Integer, nullable=False)
     decibel_peak = db.Column(db.Float, nullable=False)
     genre = db.Column(db.String(100), nullable=False)
     year = db.Column(db.Integer, nullable=False)
     mainstream_score = db.Column(db.Integer, nullable=False) # 0-100 scale
 
+    tags = db.relationship('SongTag', backref='song', lazy=True)
+
     def to_dict(self):
         return {
             "id": self.id,
+            "artist": self.artist,
+            "title": self.title,
             "bpm": self.bpm,
             "decibel_peak": self.decibel_peak,
             "genre": self.genre,
             "year": self.year,
-            "mainstream_score": self.mainstream_score
+            "mainstream_score": self.mainstream_score,
+            "tags": [t.tag_name for t in self.tags]
         }
+
+class SongTag(db.Model):
+    __tablename__ = 'song_tags'
+    id = db.Column(db.Integer, primary_key=True)
+    song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=False)
+    tag_name = db.Column(db.String(100), nullable=False)
+    count = db.Column(db.Integer, default=1) # Number of times this tag was applied in Last.fm
 
 class UserLibrary(db.Model):
     __tablename__ = 'user_libraries'

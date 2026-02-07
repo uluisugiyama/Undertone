@@ -92,8 +92,12 @@ async function loadLibrary() {
 
     libList.innerHTML = songs.map(song => `
         <div class="song-card">
-            <strong>${song.genre} (${song.year})</strong><br>
-            BPM: ${song.bpm} | Peak: ${song.decibel_peak}dB<br>
+            <strong>${song.artist} - ${song.title}</strong><br>
+            <small>${song.genre} (${song.year})</small><br>
+            BPM: ${song.bpm} | Peak: ${song.decibel_peak}dB
+            <div style="margin-top: 5px;">
+                ${song.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+            </div>
             <div class="rating-box">
                 Rate: 
                 <select onchange="rateSong(${song.id}, this.value)">

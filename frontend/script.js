@@ -26,9 +26,12 @@ document.getElementById('search-btn').addEventListener('click', async () => {
 
         resultsList.innerHTML = songs.map(song => `
             <div class="song-card">
-                <strong>ID: ${song.id}</strong> | Genre: ${song.genre} | Year: ${song.year}<br>
+                <strong>${song.artist || 'Unknown Artist'} - ${song.title || 'Untitled'}</strong><br>
+                <small>Genre: ${song.genre} | Year: ${song.year} | ID: ${song.id}</small><br>
                 BPM: ${song.bpm} | Peak: ${song.decibel_peak}dB | Mainstream: ${song.mainstream_score}
-                <br>
+                <div style="margin-top: 5px;">
+                    ${song.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                </div>
                 <button class="save-btn" onclick="saveSong(${song.id})">Save to Library</button>
             </div>
         `).join('');
