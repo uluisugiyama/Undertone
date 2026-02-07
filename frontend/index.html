@@ -1,20 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Objective Search POC</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .filter-group { margin-bottom: 10px; }
-        label { display: inline-block; width: 100px; }
-        #results { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }
-        .song-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .nav {
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: inline-block;
+            width: 100px;
+        }
+
+        #results {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+
+        .song-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .save-btn {
+            margin-top: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
+
 <body>
+    <div class="nav">
+        <strong>Search</strong> | <a href="profile.html">Profile</a>
+        <span id="user-display" style="float: right; font-size: 0.9em; color: #666;"></span>
+    </div>
     <h1>Undertone - Objective Search</h1>
-    
+
     <div class="filter-group">
         <label for="genre">Genre:</label>
         <select id="genre">
@@ -45,7 +83,7 @@
         <select id="loudness">
             <option value="any">Any</option>
             <option value="heavy">Heavy (>-10dB)</option>
-            <option value="mellow">Mellow (<=-10dB)</option>
+            <option value="mellow">Mellow (<=-10dB)< /option>
         </select>
     </div>
 
@@ -56,6 +94,7 @@
         <div id="results-list"></div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="/script.js"></script>
 </body>
+
 </html>

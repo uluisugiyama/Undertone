@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undertone - Profile & Library</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .nav {
+            margin-bottom: 20px;
+        }
+
+        .song-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .rating-box {
+            margin-top: 10px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="nav">
+        <a href="/gui">Search</a> | <strong>Profile</strong>
+    </div>
+
+    <div id="auth-section">
+        <div id="login-form">
+            <h3>Login / Register</h3>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button id="login-btn">Login</button>
+            <button id="register-btn">Register</button>
+        </div>
+        <div id="user-info" style="display: none;">
+            <h3>Welcome, <span id="display-username"></span>!</h3>
+            <button id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div id="library-section" style="display: none;">
+        <h2>My Library</h2>
+        <div id="library-list"></div>
+    </div>
+
+    <script src="/profile.js"></script>
+</body>
+
+</html>

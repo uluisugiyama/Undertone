@@ -12,11 +12,13 @@ document.getElementById('search-btn').addEventListener('click', async () => {
     if (loudness !== 'any') params.append('loudness', loudness);
 
     try {
-        const response = await fetch(`http://127.0.0.1:5001/search/objective?${params.toString()}`);
+        const response = await fetch(`/search/objective?${params.toString()}`, {
+            credentials: 'include'
+        });
         if (!response.ok) throw new Error('Search failed');
-        
+
         const songs = await response.json();
-        
+
         if (songs.length === 0) {
             resultsList.innerHTML = 'No songs found matching your criteria.';
             return;
@@ -26,6 +28,8 @@ document.getElementById('search-btn').addEventListener('click', async () => {
             <div class="song-card">
                 <strong>ID: ${song.id}</strong> | Genre: ${song.genre} | Year: ${song.year}<br>
                 BPM: ${song.bpm} | Peak: ${song.decibel_peak}dB | Mainstream: ${song.mainstream_score}
+                <br>
+                <button class="save-btn" onclick="saveSong(${song.id})">Save to Library</button>
             </div>
         `).join('');
 
@@ -34,3 +38,26 @@ document.getElementById('search-btn').addEventListener('click', async () => {
         resultsList.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
     }
 });
+
+window.addEventListener('load', async () => {
+    try {
+        const res = await fetch('/me', { credentials: 'include' });
+        const data = await res.json();
+        if (data.logged_in) {
+            document.getElementById('user-display').textContent = `Logged in as: ${data.username}`;
+        }
+    } catch (e) {
+        console.error("Session check failed", e);
+    }
+});
+
+async function saveSong(songId) {
+    const res = await fetch(`/library/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ song_id: songId })
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+}
