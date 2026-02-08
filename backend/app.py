@@ -9,13 +9,18 @@ import os
 import random
 import math
 from datetime import datetime
-from lastfm_client import LastFMClient
+import google.generativeai as genai
+import json
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.secret_key = 'undertone-secret-key-poc' # Change this in production
 CORS(app, supports_credentials=True)
 
 LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
+GEMINI_API_KEY = "AIzaSyAUJznMEn6DSqXPjOwS3YDTuXeg5XmuyJM."
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 def calculate_mainstream_score(listeners):
     if listeners <= 0:
@@ -210,49 +215,81 @@ def rate_song():
 
 @app.route('/search/intent')
 def search_intent():
-    intent = request.args.get('intent', '').lower()
+    intent = request.args.get('intent', '')
     if not intent:
         return jsonify([])
 
+    # 1. Use Gemini to parse intent into structured filters
+    prompt = f"""
+    Analyze the following music search intent: "{intent}"
+    Return a JSON object with:
+    - artist (string or null)
+    - genres (list of strings)
+    - mood (string or null)
+    - year_start (int or null)
+    - year_end (int or null)
+    - tempo (string: 'slow', 'medium', 'fast' or null)
+    - keywords (list of strings for search)
+    Return ONLY JSON.
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        # Clean potential markdown from response
+        clean_response = response.text.replace('```json', '').replace('```', '').strip()
+        parsed_intent = json.loads(clean_response)
+    except Exception as e:
+        print(f"Gemini error: {e}")
+        # Fallback to empty intent if Gemini fails
+        parsed_intent = {"artist": None, "genres": [], "mood": None, "year_start": None, "year_end": None, "tempo": None, "keywords": []}
+
     query = Song.query
     
-    # 1. Temporal Intent (Recent vs Old)
-    if any(word in intent for word in ['recent', 'new', 'modern', 'latest', '202']):
-        query = query.filter(Song.year >= 2018)
-    elif any(word in intent for word in ['old', 'classic', 'vintage', 'throwback', '90s', '80s']):
-        query = query.filter(Song.year < 2010)
+    # Apply Filters from parsed intent
+    if parsed_intent.get('artist'):
+        query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
+    
+    if parsed_intent.get('year_start'):
+        query = query.filter(Song.year >= parsed_intent['year_start'])
+    if parsed_intent.get('year_end'):
+        query = query.filter(Song.year <= parsed_intent['year_end'])
 
-    # 2. Tempo Intent
-    if any(word in intent for word in ['low tempo', 'slow', 'chill', 'relaxed', 'calm']):
+    if parsed_intent.get('tempo') == 'slow':
         query = query.filter(Song.bpm < 100)
-    elif any(word in intent for word in ['high tempo', 'fast', 'energetic', 'upbeat', 'hype']):
+    elif parsed_intent.get('tempo') == 'fast':
         query = query.filter(Song.bpm >= 125)
 
-    # 3. Loudness Intent
-    if any(word in intent for word in ['loud', 'heavy', 'aggressive', 'hard']):
-        query = query.filter(Song.decibel_peak > -10.0)
-    elif any(word in intent for word in ['soft', 'quiet', 'mellow', 'smooth']):
-        query = query.filter(Song.decibel_peak <= -15.0)
-
-    # 4. Keyword Extraction (Artist, Genre, Tags)
-    # Filter out common "stop words" from the intent
-    stop_words = {'i', 'want', 'a', 'song', 'that', 'is', 'and', 'with', 'the', 'sng', 'in', 'of', 'for', 'to', 'not'}
-    tokens = [t.strip('?!.,') for t in intent.split() if t not in stop_words]
-    
-    for token in tokens:
-        # Avoid re-applying keywords already handled by numeric filters
-        if token in ['recent', 'new', 'old', 'slow', 'fast', 'loud', 'quiet']:
-            continue
-            
-        search_filter = or_(
-            Song.artist.ilike(f"%{token}%"),
-            Song.title.ilike(f"%{token}%"),
-            Song.genre.ilike(f"%{token}%"),
-            Song.tags.any(SongTag.tag_name.ilike(f"%{token}%"))
-        )
-        query = query.filter(search_filter)
+    # Keywords (Artist, Title, Genre, Tags)
+    keywords = parsed_intent.get('keywords', [])
+    for kw in keywords:
+        query = query.filter(or_(
+            Song.artist.ilike(f"%{kw}%"),
+            Song.title.ilike(f"%{kw}%"),
+            Song.genre.ilike(f"%{kw}%"),
+            Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%"))
+        ))
 
     songs = query.limit(50).all()
+    
+    # 2. Recommendation Logic for Highly Unique Queries (Scarce Results)
+    if len(songs) < 3:
+        # If results are scarce, use Gemini to recommend general related songs
+        rec_prompt = f"""
+        The user searched for: "{intent}". 
+        We found very few matches. Recommend 5 general songs (Artist - Title) that are related to this intent.
+        Return ONLY a list of strings in valid JSON format: ["Artist - Title", ...]
+        """
+        try:
+            rec_response = model.generate_content(rec_prompt)
+            clean_rec = rec_response.text.replace('```json', '').replace('```', '').strip()
+            rec_titles = json.loads(clean_rec)
+            
+            # Surface these titles in the response (or markers for frontend to import)
+            ai_recs = [{"artist": r.split(" - ")[0], "title": r.split(" - ")[1], "ai_recommendation": True} for r in rec_titles if " - " in r]
+            return jsonify([song.to_dict() for song in songs] + ai_recs)
+        except:
+            pass
+
     return jsonify([song.to_dict() for song in songs])
 
 @app.route('/songs/explore')

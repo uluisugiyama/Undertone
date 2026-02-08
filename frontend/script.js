@@ -1,29 +1,36 @@
 // Helper to render song cards
 function renderSongCards(songs, containerId) {
-    const list = document.getElementById(containerId);
-    list.innerHTML = '';
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
 
     songs.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'glass-card song-card fade-in';
+        card.className = 'glass-card song-card';
 
-        const popularityTag = song.mainstream_score > 70 ? 'MAINSTREAM' : (song.mainstream_score < 40 ? 'NICHE' : 'BALANCED');
+        // Handle AI Recommendations vs DB results
+        const isAI = song.ai_recommendation;
+        const btnText = isAI ? 'Import to Undertone' : 'Save to Collection';
+        const btnAction = isAI ? `importExternal('${song.artist}', '${song.title}')` : `saveToLibrary(${song.id})`;
+        const metaLine = isAI ? 'AI RECOMMENDATION' : `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
+        const tagHtml = isAI ? '<p style="font-size: 0.8rem; color: var(--text-muted);">This song matches your unique intent. Import it to see full metadata.</p>' : (song.tags ? song.tags.map(t => `<span class="tag">${t.tag_name}</span>`).join('') : '');
 
         card.innerHTML = `
-            <div class="popularity-badge">${popularityTag}</div>
-            <h4>${song.title}</h4>
-            <p style="font-weight: 500; color: var(--text-main);">${song.artist}</p>
-            <p style="margin-top: 0.5rem; font-size: 0.8rem;">${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB</p>
-            
-            <div class="tags">
-                ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h4 class="song-title">${song.title}</h4>
+                    <p class="song-artist">${song.artist}</p>
+                </div>
+                <span style="font-size: 0.7rem; color: var(--accent-primary); font-weight: bold; letter-spacing: 1px;">
+                    ${isAI ? 'AI SUGGESTED' : (song.mainstream_score > 70 ? 'MAINSTREAM' : 'UNDERTONE')}
+                </span>
             </div>
-            
-            <button class="save-btn" onclick="saveToLibrary(${song.id})" style="margin-top: 1.5rem; padding: 0.6rem; font-size: 0.9rem;">
-                Save to Collection
-            </button>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.8rem 0;">${metaLine}</p>
+            <div class="tag-container">
+                ${tagHtml}
+            </div>
+            <button onclick="${btnAction}" class="action-btn" style="margin-top: 1.5rem; width: 100%;">${btnText}</button>
         `;
-        list.appendChild(card);
+        container.appendChild(card);
     });
 }
 
@@ -135,6 +142,10 @@ if (externalSearchBtn) {
             externalResults.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">External search failed.</div>';
         }
     });
+}
+
+async function importExternal(artist, title) {
+    await importTrack(artist, title);
 }
 
 async function importTrack(artist, title) {
