@@ -90,22 +90,55 @@ class SongAnalysis(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=False)
     
-    # Tempo & Rhythm
-    tempo_feel = db.Column(db.String(50)) # slow, medium, fast
-    rhythmic_complexity = db.Column(db.Float) # 0.0 - 1.0 (Simple 4/4 -> Math Rock)
+    # 1. Tempo & Rhythmic Feel
+    tempo_feel = db.Column(db.String(50)) 
+    tempo_stability = db.Column(db.Float) # 0-1 (Constant -> Variable)
+    percussive_density = db.Column(db.Float) # 0-1
+    syncopation = db.Column(db.Float) # 0-1
+    rhythmic_aggressiveness = db.Column(db.Float) # 0-1
+    groove_complexity = db.Column(db.Float) # 0-1
     
-    # Vocals
-    vocal_style = db.Column(db.String(50)) # clean, raspy, screaming, fluid, instrumental
-    vocal_presence = db.Column(db.Float) # 0.0 (Instrumental) - 1.0 (Vocal dominant)
+    # 2. Vocal Intensity & Style
+    vocal_style = db.Column(db.String(50)) 
+    vocal_presence = db.Column(db.Float) # 0-1
+    vocal_instr_ratio = db.Column(db.Float) # Ratio of vocal to instr energy
+    vocal_distortion = db.Column(db.Float) # Harshness/Distortion level
+    vocal_register = db.Column(db.String(50)) # Low, Mid, High
     
-    # Mood & Emotion
-    dark_bright = db.Column(db.Float) # 0.0 (Dark/Melancholic) - 1.0 (Bright/Happy)
-    calm_energetic = db.Column(db.Float) # 0.0 (Chill) - 1.0 (High Energy)
+    # 3. Emotional & Mood Mapping
+    dark_bright = db.Column(db.Float) # 0-1
+    calm_energetic = db.Column(db.Float) # 0-1
+    harmonic_tension = db.Column(db.Float) # 0-1 (Dissonant/Tense)
+    key_modality = db.Column(db.String(50)) # Major, Minor, Modal
+    chord_complexity = db.Column(db.Float) # 0-1
     
-    # Texture & Production
-    production_quality = db.Column(db.Float) # 0.0 (Lo-fi/Raw) - 1.0 (Polished/Hifi)
+    # 4. Genre Confidence & Blending
+    genre_distribution = db.Column(db.Text) # JSON mapping
     
-    # Genre Blending (Stored as JSON string)
-    genre_distribution = db.Column(db.Text) # e.g. {"Rock": 0.7, "Pop": 0.3}
+    # 5. Energy & Momentum
+    loudness_progression = db.Column(db.String(50)) # Rising, Falling, Constant, Waves
+    instrument_density = db.Column(db.Float) # 0-1
+    dynamic_range_compression = db.Column(db.Float) # 0-1
+    intensity_curve = db.Column(db.Text) # JSON curve
+    
+    # 6. Lyrical Content & Delivery
+    lyrical_narrative = db.Column(db.Float) # 0-1 (Abstract -> Story)
+    lyrical_repetition = db.Column(db.Float) # 0-1
+    lyrical_density = db.Column(db.Float) # 0-1
+    
+    # 7. Structural Complexity
+    section_count = db.Column(db.Integer)
+    time_signature_changes = db.Column(db.Boolean)
+    structural_variation = db.Column(db.Float) # 0-1
+    
+    # 8. Production & Texture
+    production_quality = db.Column(db.Float) # Lo-fi -> Hi-fi
+    analog_digital_feel = db.Column(db.Float) # 0-1
+    spatial_width = db.Column(db.Float) # 0-1
+    reverb_density = db.Column(db.Float) # 0-1
+    instrument_separation = db.Column(db.Float) # 0-1
+    
+    # 9. Novelty & Sonic Signature
+    sonic_uniqueness = db.Column(db.Float) # 0-1
     
     analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -13,6 +13,7 @@ from datetime import datetime
 import json
 from dotenv import load_dotenv
 from backend.lastfm_client import LastFMClient
+from backend.discovery_engine import FeatureDictionary, DiscoveryEngine
 
 load_dotenv() # Load variables from .env
 
@@ -202,27 +203,46 @@ def search_external():
 
 def enrich_song_analysis(song):
     """
-    Phase 19: Deep Music Analysis
-    Uses Gemini to infer 9-dimensional feature vectors based on university-level standards.
+    Phase 20: High-Dimensional Musicology
+    Uses Gemini to infer 25+ measurable metrics based on university-level standards.
     """
     prompt = f"""
-    Analyze the song "{song.title}" by "{song.artist}" using academic musicological standards (referencing standards from Harvard, Stanford, etc.). 
-    Provide a deep analysis with the following metrics as JSON.
+    Perform a professional musicological analysis of "{song.title}" by "{song.artist}" for an academic database.
+    Apply metrics derived from Stanford, Harvard, and Berklee standards. 
     
-    Standards to apply:
-    - Tempo: Slow (<90 BPM), Medium (90-125 BPM), Up-tempo/Fast (>125 BPM).
-    - Vocal Intensity: Screaming is defined as peak-intensity vocalizations (sustained decibel peaks > -6dB relative to mean).
-    - Complexity: Rhythmic complexity should consider polyrhythms, syncopation, and non-4/4 time signatures.
-
+    Return ONLY a JSON object with these EXACT keys:
     {{
       "tempo_feel": "slow" | "medium" | "fast",
-      "rhythmic_complexity": 0.0 to 1.0 (0=Simple 4/4, 1=Complex/Polyrhythmic),
+      "tempo_stability": 0.0-1.0 (0=Constant metronome, 1=Rubato/Variable),
+      "percussive_density": 0.0-1.0,
+      "syncopation": 0.0-1.0,
+      "rhythmic_aggressiveness": 0.0-1.0,
+      "groove_complexity": 0.0-1.0,
       "vocal_style": "clean" | "raspy" | "screaming" | "fluid" | "instrumental",
-      "vocal_presence": 0.0 to 1.0 (0=Instrumental, 1=Vocal Dominant),
-      "dark_bright": 0.0 to 1.0 (0=Dark/Melancholic, 1=Bright/Happy),
-      "calm_energetic": 0.0 to 1.0 (0=Calm/Ambient, 1=High Energy/Aggressive),
-      "production_quality": 0.0 to 1.0 (0=Lo-fi/Raw, 1=Hi-fi/Polished),
-      "genre_distribution": {{ "GenreName": 0.X }} 
+      "vocal_presence": 0.0-1.0,
+      "vocal_instr_ratio": 0.0-1.0 (Vocal volume relative to background),
+      "vocal_distortion": 0.0-1.0,
+      "vocal_register": "low" | "mid" | "high",
+      "dark_bright": 0.0-1.0,
+      "calm_energetic": 0.0-1.0,
+      "harmonic_tension": 0.0-1.0 (Dissonance level),
+      "key_modality": "Major" | "Minor" | "Modal",
+      "chord_complexity": 0.0-1.0,
+      "genre_distribution": {{ "Genre": Score }},
+      "loudness_progression": "Rising" | "Falling" | "Constant" | "Waves",
+      "instrument_density": 0.0-1.0,
+      "compression": 0.0-1.0 (Dynamic range flatness),
+      "lyrical_narrative": 0.0-1.0,
+      "lyrical_repetition": 0.0-1.0,
+      "lyrical_density": 0.0-1.0,
+      "section_count": int,
+      "time_signature_changes": bool,
+      "structural_variation": 0.0-1.0,
+      "production_texture": 0.0-1.0 (0=Analog/Raw, 1=Digital/Polished),
+      "spatial_width": 0.0-1.0,
+      "reverb_density": 0.0-1.0,
+      "instrument_separation": 0.0-1.0,
+      "sonic_uniqueness": 0.0-1.0
     }}
     Return ONLY JSON.
     """
@@ -235,19 +255,42 @@ def enrich_song_analysis(song):
         analysis = SongAnalysis(
             song_id=song.id,
             tempo_feel=data.get('tempo_feel', 'medium'),
-            rhythmic_complexity=float(data.get('rhythmic_complexity', 0.5)),
+            tempo_stability=float(data.get('tempo_stability', 0.1)),
+            percussive_density=float(data.get('percussive_density', 0.5)),
+            syncopation=float(data.get('syncopation', 0.2)),
+            rhythmic_aggressiveness=float(data.get('rhythmic_aggressiveness', 0.3)),
+            groove_complexity=float(data.get('groove_complexity', 0.3)),
             vocal_style=data.get('vocal_style', 'clean'),
             vocal_presence=float(data.get('vocal_presence', 0.5)),
+            vocal_instr_ratio=float(data.get('vocal_instr_ratio', 0.7)),
+            vocal_distortion=float(data.get('vocal_distortion', 0.0)),
+            vocal_register=data.get('vocal_register', 'mid'),
             dark_bright=float(data.get('dark_bright', 0.5)),
             calm_energetic=float(data.get('calm_energetic', 0.5)),
-            production_quality=float(data.get('production_quality', 0.8)),
-            genre_distribution=json.dumps(data.get('genre_distribution', {}))
+            harmonic_tension=float(data.get('harmonic_tension', 0.2)),
+            key_modality=data.get('key_modality', 'Major'),
+            chord_complexity=float(data.get('chord_complexity', 0.3)),
+            genre_distribution=json.dumps(data.get('genre_distribution', {})),
+            loudness_progression=data.get('loudness_progression', 'Constant'),
+            instrument_density=float(data.get('instrument_density', 0.6)),
+            dynamic_range_compression=float(data.get('compression', 0.5)),
+            lyrical_narrative=float(data.get('lyrical_narrative', 0.5)),
+            lyrical_repetition=float(data.get('lyrical_repetition', 0.3)),
+            lyrical_density=float(data.get('lyrical_density', 0.5)),
+            section_count=int(data.get('section_count', 4)),
+            time_signature_changes=bool(data.get('time_signature_changes', False)),
+            structural_variation=float(data.get('structural_variation', 0.3)),
+            analog_digital_feel=float(data.get('production_texture', 0.5)),
+            spatial_width=float(data.get('spatial_width', 0.6)),
+            reverb_density=float(data.get('reverb_density', 0.3)),
+            instrument_separation=float(data.get('instrument_separation', 0.7)),
+            sonic_uniqueness=float(data.get('sonic_uniqueness', 0.5))
         )
         db.session.add(analysis)
         db.session.commit()
         print(f"Deep Analysis complete for {song.title}")
     except Exception as e:
-        print(f"Deep Analysis failed for {song.title}: {e}")
+        print(f"High-Dimensional Analysis failed for {song.title}: {e}")
 
 def _perform_song_import(artist, title):
     # Check if exists
@@ -376,9 +419,6 @@ def save_to_library():
     if not song_id:
         return jsonify({"error": "Song ID or Artist/Title required"}), 400
 
-    if not song_id:
-        return jsonify({"error": "Song ID or Artist/Title required"}), 400
-
     # Check existence
     existing_entry = UserLibrary.query.filter_by(user_id=session['user_id'], song_id=song_id).first()
     if not existing_entry:
@@ -402,15 +442,12 @@ def save_to_library():
         db.session.add(trending)
         
     # PHASE 18: FEEDBACK LOOP
-    # If the frontend sends feedback tags (from the search intent that led to this save),
-    # increment them to reinforce the connection.
     feedback_tags = data.get('feedback_tags', [])
     if feedback_tags:
         for t_name in feedback_tags:
             t_name = t_name.strip()
             if not t_name: continue
             
-            # Find or create tag for this song
             tag = SongTag.query.filter(
                 SongTag.song_id == song_id, 
                 SongTag.tag_name.ilike(t_name)
@@ -418,13 +455,10 @@ def save_to_library():
             
             if tag:
                 tag.count += 1
-                print(f"DEBUG: Incremented tag '{t_name}' for song {song_id} to {tag.count}")
             else:
-                # Only add new tags if they seem legitimate (basic length check for now)
                 if len(t_name) < 30:
                     new_tag = SongTag(song_id=song_id, tag_name=t_name.title(), count=1)
                     db.session.add(new_tag)
-                    print(f"DEBUG: Created new Crowd Tag '{t_name}' for song {song_id}")
 
     db.session.commit()
     return jsonify({"message": "Song saved to library"}), 201
@@ -442,7 +476,6 @@ def get_library():
         song = Song.query.get(entry.song_id)
         if song:
             song_data = song.to_dict()
-            # Fetch user's rating for this song
             rating_entry = UserRating.query.filter_by(user_id=user_id, song_id=song.id).first()
             song_data['user_rating'] = rating_entry.rating if rating_entry else 0
             song_data['user_comment'] = rating_entry.comment if rating_entry else ""
@@ -471,7 +504,6 @@ def rate_song():
     
     db.session.commit()
 
-    # Phase 7: Shared Taste - Refine tags based on user comment
     if comment and len(comment) > 5:
         refine_prompt = f"""
         Analyze this user review for a song: "{comment}"
@@ -508,15 +540,8 @@ def search_intent():
         try:
             parsed_intent = json.loads(intent[10:])
             print(f"DEBUG: Using Mock Intent: {parsed_intent}")
-            # Skip Gemini and Profile context
-            # We need to ensure variables are set or logic flow works
             user_id = session.get('user_id')
             user_profile = _get_user_profile(user_id) if user_id else {"top_tags": [], "fav_genre": None}
-            # Skip to filtering logic...
-            # We need to wrap the Gemini call in an if/else or reorganize
-            # Let's handle this by setting a flag or just bypassing the Gemini block below
-            # But the Gemini block is large.
-            # Best: set parsed_intent here and wrap Gemini block in "if not parsed_intent:"
         except Exception as e:
             print(f"Mock JSON error: {e}")
             return jsonify([])
@@ -531,21 +556,14 @@ def search_intent():
     if user_profile['top_tags']:
         context_str = f"\nUser Preferences Context: Favorite Genres: {user_profile['fav_genre']}, Top Vibe Tags: {', '.join(user_profile['top_tags'][:8])}"
 
-    # 2. Use Gemini to parse intent into structured filters AND deep feature vectors
+    # 2. Use Gemini to parse intent into structured filters AND high-dimensional keywords
     if not parsed_intent:
         prompt = f"""
         Analyze the music search intent: "{intent}"
         {context_str}
         
         1. Extract standard filters (artist, genre, mood).
-        2. Map vague descriptors to specific 9-dimensional feature constraints.
-           - tempo_feel: slow, medium, fast
-           - rhythmic_complexity: 0.0-1.0
-           - vocal_style: clean, raspy, screaming, fluid, instrumental
-           - vocal_presence: 0.0-1.0
-           - dark_bright: 0.0-1.0
-           - calm_energetic: 0.0-1.0
-           - production_quality: 0.0-1.0
+        2. Identify specific high-dimensional keywords (e.g. slow, atmospheric, energetic, lofi, melodic).
         
         Return JSON:
         {{
@@ -554,13 +572,8 @@ def search_intent():
           "mood": null,
           "year_start": null, 
           "year_end": null,
-          "tempo": null,
           "keywords": [],
-          "external_search_query": "...",
-          "feature_constraints": [
-              {{"feature": "dark_bright", "min": 0.0, "max": 0.3}},
-              {{"feature": "vocal_style", "values": ["screaming", "raspy"]}}
-          ] 
+          "external_search_query": "..."
         }}
         """
         
@@ -568,189 +581,24 @@ def search_intent():
             response_text = call_gemini_api(prompt)
             clean_response = response_text.replace('```json', '').replace('```', '').strip()
             parsed_intent = json.loads(clean_response)
-            print(f"DEBUG PARSED INTENT: {parsed_intent}")
         except Exception as e:
             print(f"Gemini error: {e}")
-            # Intelligent Fallback
-            fallback_genres = []
-            normalized = intent.lower()
-            common_genres = ['rock', 'pop', 'hip hop', 'rap', 'jazz', 'blues', 'country', 'metal', 'classical', 'electronic', 'dance', 'indie', 'r&b', 'soul', 'folk', 'punk']
-            
-            for g in common_genres:
-                if g in normalized:
-                    fallback_genres.append(g.title())
-                    
-            # Fallback Tempo Detection
-            fallback_tempo = None
-            if 'slow' in normalized or 'chill' in normalized or 'down' in normalized or 'ballad' in normalized:
-                fallback_tempo = 'slow'
-            elif 'fast' in normalized or 'up' in normalized or 'energetic' in normalized or 'punk' in normalized:
-                fallback_tempo = 'fast'
-            
             parsed_intent = {
-                "artist": None, 
-                "genres": fallback_genres, 
-                "mood": None, 
-                "year_start": None, 
-                "year_end": None, 
-                "tempo": fallback_tempo, 
-                "keywords": [], 
-                "external_search_query": intent,
-                "feature_constraints": [] 
+                "artist": None, "genres": [], "mood": None, 
+                "year_start": None, "year_end": None, 
+                "keywords": [intent], "external_search_query": intent
             }
 
-    # Phase 6: Log Intent
-    new_log = SearchLog(
-        user_id=user_id,
-        intent=intent,
-        mode=request.args.get('mode', 'all')
-    )
+    # 3. Log intent for Social Reinforcement
+    new_log = SearchLog(user_id=user_id, intent=intent, mode=request.args.get('mode', 'all'))
     db.session.add(new_log)
     db.session.commit()
     
-    # SAFETY NET: If AI missed the tempo but the user explicitly stated it, override.
-    # SKIP for Mock JSON (debug) to avoid self-triggering on JSON keys
-    if not parsed_intent.get('tempo') and not intent.startswith("MOCK_JSON:"):
-        normalized = intent.lower()
-        if 'slow' in normalized or 'chill' in normalized or 'down' in normalized or 'ballad' in normalized:
-            parsed_intent['tempo'] = 'slow'
-        elif 'fast' in normalized or 'up' in normalized or 'energetic' in normalized or 'punk' in normalized:
-            parsed_intent['tempo'] = 'fast'
-            
-    query = Song.query 
-
-    # Apply Mode Filter
-    mode = request.args.get('mode', 'all')
-    if mode == 'mainstream':
-        query = query.filter(Song.mainstream_score >= 70)
-    elif mode == 'niche':
-        query = query.filter(Song.mainstream_score < 70)
-
-    filters_applied = False
-
-    # Apply Metadata Filters
-    if parsed_intent.get('artist'):
-        query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
-        filters_applied = True
-    
-    if parsed_intent.get('year_start'):
-        query = query.filter(Song.year >= parsed_intent['year_start'])
-        filters_applied = True
-    if parsed_intent.get('year_end'):
-        query = query.filter(Song.year <= parsed_intent['year_end'])
-        filters_applied = True
-
-    if parsed_intent.get('tempo') == 'slow':
-        query = query.filter(Song.bpm < 100)
-        filters_applied = True
-    elif parsed_intent.get('tempo') == 'medium':
-        query = query.filter(Song.bpm >= 100, Song.bpm <= 125)
-        filters_applied = True
-    elif parsed_intent.get('tempo') == 'fast':
-        query = query.filter(Song.bpm > 125)
-        filters_applied = True
-
-    # 3. GENRE CORE FILTER (Prioritized over Title Keywords)
-    genres = parsed_intent.get('genres', [])
-    if genres:
-        genre_filters = [Song.genre.ilike(f"%{g}%") for g in genres]
-        
-        # PHASE 18: SUBJECTIVE CROWD WISDOM
-        # If a tag matches the genre key and has high consensus (count >= 3), treat it as a valid genre match.
-        # This allows a song metadata-ed as "Pop" to show up in "Rock" if 3+ users tagged it "Rock".
-        tag_filters = [Song.tags.any(and_(SongTag.tag_name.ilike(f"%{g}%"), SongTag.count >= 3)) for g in genres]
-        
-        query = query.filter(or_(*genre_filters, *tag_filters))
-        filters_applied = True
-
-    # 4. Keyword/Mood matching (Subjective Consensus Layer)
-    mood = parsed_intent.get('mood')
-    keywords = parsed_intent.get('keywords', [])
-    search_terms = keywords + ([mood] if mood else [])
-    
-    if search_terms:
-        filters_applied = True
-        for kw in search_terms:
-            # PHASE 18: SUBJECTIVE CONSENSUS
-            # Only match keywords in tags if they have count >= 3 (unless the user has explicitly added them)
-            query = query.filter(or_(
-                Song.tags.any(and_(SongTag.tag_name.ilike(f"%{kw}%"), SongTag.count >= 3)),
-                # Only match artist/title if it's not a generic genre name
-                or_(
-                    Song.artist.ilike(f"%{kw}%"),
-                    Song.title.ilike(f"%{kw}%")
-                ) if kw.lower() not in ['rock', 'pop', 'jazz', 'lofi', 'metal'] else False
-            ))
-
-    # PHASE 19: DEEP FEATURE VECTOR FILTERING
-    feature_constraints = parsed_intent.get('feature_constraints', [])
-    if feature_constraints:
-        print(f"DEBUG: Applying {len(feature_constraints)} Deep Feature Constraints")
-        # Use LEFT OUTER JOIN so songs without analysis yet still appear but can be filtered/scored
-        query = query.outerjoin(SongAnalysis)
-        filters_applied = True
-        
-        for constraint in feature_constraints:
-            feature = constraint.get('feature')
-            
-            # Numeric Range (min/max)
-            if 'min' in constraint or 'max' in constraint:
-                col = getattr(SongAnalysis, feature, None)
-                if col:
-                    if 'min' in constraint:
-                        query = query.filter(or_(col >= constraint['min'], col == None))
-                    if 'max' in constraint:
-                        query = query.filter(or_(col <= constraint['max'], col == None))
-            
-            # Categorical Values (Enum)
-            if 'values' in constraint:
-                col = getattr(SongAnalysis, feature, None)
-                if col:
-                    query = query.filter(or_(col.in_(constraint['values']), col == None))
-
-    # CRITICAL FIX: Fallback
-    if not filters_applied and intent:
-        print("DEBUG: Fallback logic triggered!")
-        query = query.filter(or_(
-            Song.genre.ilike(f"%{intent}%"),
-            Song.tags.any(and_(SongTag.tag_name.ilike(f"%{intent}%"), SongTag.count >= 3)),
-            Song.artist.ilike(f"%{intent}%"),
-            Song.title.ilike(f"%{intent}%")
-        ))
-        
-    print(f"DEBUG: Parsed Intent: {parsed_intent}")
-    print(f"DEBUG: Filters Applied: {filters_applied}")
-    
-    # --- TWO-PASS SEARCH STRATEGY ---
-    db_songs_strict = query.limit(100).all()
-    
-    # 5. External Discovery
-    ext_query = parsed_intent.get('external_search_query')
-    has_artist_match = False
-    if parsed_intent.get('artist'):
-         has_artist_match = any(parsed_intent['artist'].lower() in s['artist'].lower() for s in all_songs)
-         
-    if (len(all_songs) < 8 or not has_artist_match) and ext_query:
-        client = LastFMClient(LASTFM_API_KEY)
-        external_results = client.search_track(ext_query, limit=15)
-        
-        existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in all_songs)
-        for res in external_results:
-            key = f"{res['artist'].lower()}|{res['title'].lower()}"
-            if key not in existing_keys:
-                all_songs.append({
-                    "artist": res['artist'],
-                    "title": res['title'],
-                    "ai_recommendation": True,
-                    "genre": "External Discovery",
-                    "bpm": "Unknown",
-                    "decibel_peak": "Unknown"
-                })
-                existing_keys.add(key)
-
-    # 6. RE-RANKING FOR PERSONALIZATION & SHARED ACTIVITY
+    # Phase 20: High-Dimensional Discover Optimization
+    # 1. Integrate Social Signals (Shared Activity & Personal Trending)
     shared_hits = {}
     if intent:
+        # Boost songs that others (or the user) have selected for similar intents
         hist_hits = SearchLog.query.filter(
             SearchLog.intent.ilike(f"%{intent}%"),
             SearchLog.selected_song_id != None
@@ -763,38 +611,76 @@ def search_intent():
         pt = PersonalTrending.query.filter_by(user_id=user_id).all()
         personal_trending_ids = {item.song_id: item.engagement_count for item in pt}
 
-    def calculate_relevance(song_dict):
-        score = song_dict.get('base_score', 0)
-        sid = song_dict.get('id')
+    # 2. Expand Intent into Target Vectors
+    search_keywords = parsed_intent.get('keywords', [])
+    if parsed_intent.get('mood'):
+        search_keywords.append(parsed_intent['mood'])
+    
+    target_vector = FeatureDictionary.expand_intent(search_keywords)
+    
+    # 3. Broad Candidate Selection
+    query = Song.query.outerjoin(SongAnalysis)
+    
+    # Apply Basic Mode Filters (Hard Constraints)
+    mode = request.args.get('mode', 'all')
+    if mode == 'mainstream':
+        query = query.filter(Song.mainstream_score >= 70)
+    elif mode == 'niche':
+        query = query.filter(Song.mainstream_score < 70)
         
-        if user_profile['fav_genre'] and song_dict['genre'] == user_profile['fav_genre']:
-            score += 50
-            
-        if sid in shared_hits:
-            score += shared_hits[sid] * 15 # Strengthen shared knowledge
-            
-        if sid in personal_trending_ids:
-            score += personal_trending_ids[sid] * 5
-            
-        if 'tags' in song_dict:
-            # Personal Profile Overlap
-            overlap = set(user_profile['top_tags']).intersection(set(song_dict['tags']))
-            score += len(overlap) * 2
-            
-            # Semantic Consensus Boost
-            active_terms = set([g.lower() for g in parsed_intent.get('genres', [])] + [k.lower() for k in parsed_intent.get('keywords', [])])
-            for t in song_dict['tags']:
-                if t.lower() in active_terms:
-                    score += 5 # Direct semantic match boost
-            
-        return score
+    # Metadata Optimization (Artist/Genre)
+    if parsed_intent.get('artist'):
+        query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
+    if parsed_intent.get('genres'):
+        query = query.filter(or_(*[Song.genre.ilike(f"%{g}%") for g in parsed_intent['genres']]))
 
-    all_songs.sort(key=calculate_relevance, reverse=True)
+    # 3. High-Dimensional Scoring
+    candidates = query.limit(250).all()
+    all_songs = []
+    
+    for s in candidates:
+        s_dict = s.to_dict()
+        # Find analysis
+        analysis = SongAnalysis.query.filter_by(song_id=s.id).first()
+        
+        # Calculate Similarity across all expanded dimensions
+        sim_score, sim_details = DiscoveryEngine.calculate_similarity(analysis, target_vector)
+        s_dict['sim_score'] = sim_score
+        s_dict['sim_reasoning'] = sim_details
+        
+        # Combine with Social/Metadata boosts
+        base_relevance = 0
+        sid = s.id
+        
+        if user_id:
+            profile = _get_user_profile(user_id)
+            # Favorite Genre Boost
+            if s.genre == profile['fav_genre']:
+                base_relevance += 15
+            
+            # Personal Trending Boost
+            if sid in personal_trending_ids:
+                base_relevance += personal_trending_ids[sid] * 5
+
+        # Shared Activity Boost (Crowd Wisdom)
+        if sid in shared_hits:
+            base_relevance += min(shared_hits[sid] * 10, 40) # Cap boost
+
+        # Final Ranking Score
+        s_dict['ranking_score'] = (sim_score * 100) + base_relevance
+        all_songs.append(s_dict)
+
+    # 4. Sort and finalize
+    all_songs.sort(key=lambda x: x['ranking_score'], reverse=True)
     
     return jsonify({
         "songs": all_songs[:50],
         "search_log_id": new_log.id,
-        "parsed_intent": parsed_intent 
+        "parsed_intent": parsed_intent,
+        "expansion_stats": {
+            "keywords_expanded": search_keywords,
+            "dimensions_checked": list(target_vector.keys())
+        }
     })
 
 @app.route('/songs/explore')
@@ -866,7 +752,6 @@ def get_recommendations():
             scored_recs.append(song_dict)
             
     # 4. Diversity Filter: Sort and then limit per artist
-    # Sort by score descending
     scored_recs.sort(key=lambda x: x['_sort_key'], reverse=True)
     
     final_recs = []
@@ -876,12 +761,11 @@ def get_recommendations():
         artist = rec['artist'].lower()
         count = artist_counts.get(artist, 0)
         
-        # Limit to 2 tracks per artist in the recommendation list
         if count < 2:
             final_recs.append(rec)
             artist_counts[artist] = count + 1
         
-        if len(final_recs) >= 12: # Return a bit more for plenty of choice
+        if len(final_recs) >= 12: 
             break
             
     return jsonify(final_recs)

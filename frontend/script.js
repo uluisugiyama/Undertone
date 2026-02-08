@@ -7,19 +7,28 @@ function renderSongCards(songs, containerId, searchLogId = null) {
         const card = document.createElement('div');
         card.className = 'song-card fade-in';
 
-        const isAI = song.ai_recommendation;
         const btnAction = `saveToLibrary(${song.id || 'null'}, ${searchLogId}, '${song.artist.replace(/'/g, "\\'")}', '${song.title.replace(/'/g, "\\'")}')`;
         const metaLine = `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
         const tagHtml = (song.tags && song.tags.length > 0) ? song.tags.map(t => `<span class="tag">${t}</span>`).join('') : '<span class="tag" style="opacity: 0.5;">Unidentified</span>';
 
-        // Objective vs Subjective reasoning
-        let reasoning = isAI ? 'Global Wire Service: AI Suggestion' : 'Local Archive: Metric Consistency';
-        if (song.match_type === 'relaxed') reasoning = 'Semantic Match: Broad Discovery';
+        // High-Dimensional Reasoning Display
+        const simScore = song.sim_score ? Math.round(song.sim_score * 100) : null;
+        const reasoning = song.sim_reasoning || (song.ai_recommendation ? 'Extended Discovery Match' : 'Direct Database Match');
 
-        card.innerHTML = `
+        const reasoningHtml = song.sim_reasoning ? `
+            <div class="reasoning-block" style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px; border-left: 2px solid var(--accent-red);">
+                <div style="font-size: 0.6rem; color: var(--accent-red); margin-bottom: 2px;">DISCOVERY REASONING</div>
+                <div style="font-size: 0.75rem; color: #ddd; line-height: 1.2;">${reasoning}</div>
+                ${simScore ? `<div style="font-size: 0.6rem; margin-top: 4px; color: #888;">Similarity: ${simScore}%</div>` : ''}
+            </div>
+        ` : `
             <div style="font-size:0.65rem; font-weight:800; color:var(--accent-red); margin-bottom:0.8rem; text-transform:uppercase; letter-spacing:1px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
                 ${reasoning}
             </div>
+        `;
+
+        card.innerHTML = `
+            ${reasoningHtml}
             <h4>${song.title}</h4>
             <div class="artist">${song.artist}</div>
             <div class="meta">${metaLine}</div>
@@ -102,6 +111,22 @@ document.getElementById('search-btn').addEventListener('click', async () => {
         }
 
         renderSongCards(songs, 'results-list', searchLogId);
+
+        // Update Discovery Stats (Vibe Expansion UI)
+        const statsEl = document.getElementById('discovery-stats');
+        const descEl = document.getElementById('expansion-desc');
+        const targetsEl = document.getElementById('dimensional-targets');
+
+        if (data.expansion_stats && data.expansion_stats.keywords_expanded.length > 0) {
+            statsEl.style.display = 'block';
+            descEl.innerText = `Intent Decomposed: "${data.expansion_stats.keywords_expanded.join('", "')}" was expanded into ${data.expansion_stats.dimensions_checked.length} measurable musical target vectors.`;
+
+            targetsEl.innerHTML = data.expansion_stats.dimensions_checked.map(dim =>
+                `<span class="tag" style="background: rgba(0,0,0,0.2); color: #fff; font-size: 0.65rem; border: 1px solid rgba(255,255,255,0.1);">${dim.replace(/_/g, ' ')}</span>`
+            ).join('');
+        } else {
+            statsEl.style.display = 'none';
+        }
     } catch (err) {
         console.error(err);
         resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">Search failed. Analysis engine offline.</div>';
