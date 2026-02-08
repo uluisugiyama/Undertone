@@ -18,7 +18,7 @@ load_dotenv() # Load variables from .env
 
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
-app.secret_key = 'undertone-secret-key-poc' # Change this in production
+app.secret_key = os.getenv('SECRET_KEY', 'undertone-secret-key-poc') 
 CORS(app, supports_credentials=True)
 
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
@@ -65,15 +65,23 @@ def serve_static(path):
 
 # Basic SQLite configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'undertone.db')
+database_url = os.getenv('DATABASE_URL')
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///' + os.path.join(basedir, 'undertone.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 migrate = Migrate(app, db)
 
 @app.route('/')
-def hello_world():
-    return jsonify({"message": "Hello World! Undertone API is running."})
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/healthz')
+def health_check():
+    return jsonify({"status": "ok", "db": "connected"}), 200
 
 # --- EXTERNAL API ENDPOINTS ---
 
