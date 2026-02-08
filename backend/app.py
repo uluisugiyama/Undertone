@@ -302,39 +302,60 @@ def search_intent():
     elif mode == 'niche':
         query = query.filter(Song.mainstream_score < 70)
 
+    filters_applied = False
+
     # Apply Filters from parsed intent
     if parsed_intent.get('artist'):
         query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
+        filters_applied = True
     
     if parsed_intent.get('year_start'):
         query = query.filter(Song.year >= parsed_intent['year_start'])
+        filters_applied = True
     if parsed_intent.get('year_end'):
         query = query.filter(Song.year <= parsed_intent['year_end'])
+        filters_applied = True
 
     if parsed_intent.get('tempo') == 'slow':
         query = query.filter(Song.bpm < 100)
+        filters_applied = True
     elif parsed_intent.get('tempo') == 'medium':
         query = query.filter(Song.bpm >= 100, Song.bpm <= 125)
+        filters_applied = True
     elif parsed_intent.get('tempo') == 'fast':
         query = query.filter(Song.bpm > 125)
+        filters_applied = True
 
     # Genre Filter
     genres = parsed_intent.get('genres', [])
     if genres:
         genre_filters = [Song.genre.ilike(f"%{g}%") for g in genres]
         query = query.filter(or_(*genre_filters))
+        filters_applied = True
 
     # Mood/Keyword Filter (Artist, Title, Genre, Tags)
     mood = parsed_intent.get('mood')
     keywords = parsed_intent.get('keywords', [])
     search_terms = keywords + ([mood] if mood else [])
     
-    for kw in search_terms:
+    if search_terms:
+        filters_applied = True
+        for kw in search_terms:
+            query = query.filter(or_(
+                Song.artist.ilike(f"%{kw}%"),
+                Song.title.ilike(f"%{kw}%"),
+                Song.genre.ilike(f"%{kw}%"),
+                Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%"))
+            ))
+
+    # CRITICAL FIX: If no AI filters were applied (e.g. Gemini failed or vague intent), 
+    # fall back to a raw text search on the intent to avoid returning random "Select All" results.
+    if not filters_applied and intent:
         query = query.filter(or_(
-            Song.artist.ilike(f"%{kw}%"),
-            Song.title.ilike(f"%{kw}%"),
-            Song.genre.ilike(f"%{kw}%"),
-            Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%"))
+            Song.artist.ilike(f"%{intent}%"),
+            Song.title.ilike(f"%{intent}%"),
+            Song.genre.ilike(f"%{intent}%"),
+            Song.tags.any(SongTag.tag_name.ilike(f"%{intent}%"))
         ))
 
     songs = query.limit(50).all()
@@ -342,7 +363,13 @@ def search_intent():
     
     # 2. Collaborative API Logic: If results are low, search Last.fm using Gemini's query
     ext_query = parsed_intent.get('external_search_query')
-    if (len(all_songs) < 10 or "drake" in intent.lower()) and ext_query:
+    
+    # Ensure strict fallback for explicit artist mentions if local DB fails
+    has_artist_match = False
+    if parsed_intent.get('artist'):
+         has_artist_match = any(parsed_intent['artist'].lower() in s['artist'].lower() for s in all_songs)
+         
+    if (len(all_songs) < 10 or not has_artist_match) and ext_query:
         client = LastFMClient(LASTFM_API_KEY)
         external_results = client.search_track(ext_query, limit=15)
         
