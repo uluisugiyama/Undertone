@@ -97,9 +97,23 @@ def seed_db_endpoint():
     try:
         from backend.seed_minimal import seed_minimal
         seed_minimal()
-        return jsonify({"message": "Database seeded successfully!"}), 200
+        return jsonify({"message": "Database seeded successfully with minimal data!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# AUTOMATION: Endpoint to ingest REAL data (requires API keys)
+@app.route('/admin/ingest_full')
+def ingest_full_endpoint():
+    try:
+        if not os.getenv("LASTFM_API_KEY"):
+            return jsonify({"error": "LASTFM_API_KEY not set in environment variables"}), 500
+            
+        from backend.ingest_data import seed_real_data
+        # Run safely
+        seed_real_data()
+        return jsonify({"message": "Full ingestion complete! Added ~100 songs."}), 200
+    except Exception as e:
+        return jsonify({"error": f"Ingestion failed: {str(e)}"}), 500
 
 @app.route('/')
 def serve_index():
