@@ -18,7 +18,7 @@ load_dotenv() # Load variables from .env
 
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
-# app.secret_key = os.getenv('SECRET_KEY', 'undertone-secret-key-poc') 
+app.secret_key = os.getenv('SECRET_KEY', 'undertone-secret-key-poc') 
 CORS(app, supports_credentials=True)
 
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
@@ -234,19 +234,27 @@ def get_contradictions():
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    
-    if User.query.filter_by(username=username).first():
-        return jsonify({"error": "User already exists"}), 400
-    
-    hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
-    new_user = User(username=username, password_hash=hashed_pw)
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({"message": "User registered successfully"}), 201
+    try:
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password required"}), 400
+
+        if User.query.filter_by(username=username).first():
+            return jsonify({"error": "User already exists"}), 400
+        
+        hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
+        new_user = User(username=username, password_hash=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        return jsonify({"message": "User registered successfully"}), 201
+    except Exception as e:
+        print(f"Registration Error: {e}")
+        db.session.rollback()
+        return jsonify({"error": "Registration failed", "details": str(e)}), 500
 
 @app.route('/login', methods=['POST'])
 def login():
