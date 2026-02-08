@@ -14,9 +14,17 @@ def seed_real_data():
     client = LastFMClient(LASTFM_API_KEY)
     
     with app.app_context():
-        print("Clearing existing songs...")
-        Song.query.delete()
-        db.session.commit()
+        # Optimization: If we already have songs, maybe don't delete unless requested?
+        # For POC/Simplicity, we'll keep it as is but add a print
+        # Actually, let's make it additive if songs exist to avoid nuking DB on every click.
+        existing_count = Song.query.count()
+        if existing_count > 10:
+             print(f"Skipping song deletion. DB already has {existing_count} songs.")
+        else:
+            print("Clearing existing songs...")
+            # We use a more careful delete for Postgres
+            Song.query.delete()
+            db.session.commit()
         
         genres = list(GENRE_TAXONOMY.keys())
         total_songs = 0

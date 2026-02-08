@@ -115,6 +115,45 @@ def ingest_full_endpoint():
     except Exception as e:
         return jsonify({"error": f"Ingestion failed: {str(e)}"}), 500
 
+@app.route('/admin/enrich_db')
+def enrich_db_endpoint():
+    try:
+        from backend.enrich_data import enrich_songs
+        enrich_songs()
+        return jsonify({"message": "Enrichment (Tags/Mainstream Score) complete!"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/analyze_db')
+def analyze_db_endpoint():
+    try:
+        from backend.backfill_analysis import backfill
+        backfill()
+        return jsonify({"message": "Deep Analysis (Gemini Vectors) complete!"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/ingest_complete')
+def ingest_complete_endpoint():
+    try:
+        if not os.getenv("LASTFM_API_KEY"):
+            return jsonify({"error": "LASTFM_API_KEY not set"}), 500
+        if not os.getenv("GEMINI_API_KEY"):
+            return jsonify({"error": "GEMINI_API_KEY not set"}), 500
+            
+        from backend.ingest_data import seed_real_data
+        from backend.enrich_data import enrich_songs
+        from backend.backfill_analysis import backfill
+        
+        print("Starting Complete Pipeline...")
+        seed_real_data()
+        enrich_songs()
+        backfill()
+        
+        return jsonify({"message": "Complete Pipeline Success! App is now fully optimized."}), 200
+    except Exception as e:
+        return jsonify({"error": f"Pipeline failed: {str(e)}"}), 500
+
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -708,7 +747,7 @@ def search_intent():
             for s in db_songs_relaxed:
                 s_dict = s.to_dict()
                 s_dict['match_type'] = 'relaxed'
-                s_dict['base_score'] = 0 # Baseline for partially matched
+                s_dict['base_score'] = 500 # Baseline for partially matched (Higher than 0 to prioritize over external)
                 all_songs.append(s_dict)
                 
     print(f"DEBUG: Total Songs Found: {len(all_songs)}")
