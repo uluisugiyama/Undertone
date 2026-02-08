@@ -107,30 +107,30 @@ async function loadLibrary() {
 
     songs.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'glass-card song-card fade-in';
+        card.className = 'song-card fade-in';
         card.innerHTML = `
-            <h4>${song.title}</h4>
-            <p style="font-weight: 500; color: var(--text-main);">${song.artist}</p>
-            <p style="font-size: 0.8rem; margin-top: 0.3rem;">${song.genre} • ${song.bpm} BPM</p>
-            
-            <div class="tags">
-                ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
-            </div>
+        <h4>${song.title}</h4>
+        <div class="artist">${song.artist}</div>
+        <div class="meta">${song.genre} • ${song.bpm} BPM</div>
+        
+        <div class="tags">
+            ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>
 
-            <div class="rating-box">
-                <label style="font-size: 0.7rem;">MY REVIEW</label>
-                <div class="rating-stars" id="stars-${song.id}" data-value="${song.user_rating || 0}">
-                    ${[1, 2, 3, 4, 5].map(i => `
-                        <span class="star ${(song.user_rating >= i) ? 'active' : ''}" 
-                              onclick="rateSong(${song.id}, ${i})">★</span>
-                    `).join('')}
-                </div>
-                <textarea id="comment-${song.id}" placeholder="How does this track resonate?">${song.user_comment || ''}</textarea>
-                <button onclick="saveRating(${song.id})" style="margin-top: 1rem; background: var(--bg-input); border: 1px solid var(--glass-border-bright); font-size: 0.75rem; padding: 0.5rem; border-radius: 8px;">
-                    Update Review
-                </button>
+        <div class="rating-box" style="margin-top: 1.5rem;">
+            <div style="font-weight:800; font-size:0.7rem; text-transform:uppercase; margin-bottom:0.5rem;">Reader Rating</div>
+            <div class="rating-stars" id="stars-${song.id}" data-value="${song.user_rating || 0}">
+                ${[1, 2, 3, 4, 5].map(i => `
+                    <span class="star ${(song.user_rating >= i) ? 'active' : ''}" 
+                          onclick="rateSong(${song.id}, ${i})">★</span>
+                `).join('')}
             </div>
-        `;
+            <textarea id="comment-${song.id}" placeholder="Editorial notes...">${song.user_comment || ''}</textarea>
+            <button onclick="saveRating(${song.id})" style="margin-top: 1rem; font-size: 0.75rem; padding: 0.8rem;">
+                UPDATE NOTES
+            </button>
+        </div>
+    `;
         list.appendChild(card);
     });
 }
@@ -174,27 +174,27 @@ async function loadRecommendations() {
     const list = document.getElementById('recommendations-list');
 
     if (songs.length === 0) {
-        list.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Rate more songs to unlock personalized suggestions.</div>';
+        list.innerHTML = '<div class="editorial-card" style="grid-column: 1/-1; text-align: center;">Curate more resonance to unlock suggestions.</div>';
         return;
     }
 
     list.innerHTML = '';
     songs.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'glass-card song-card fade-in';
+        card.className = 'song-card fade-in';
         card.innerHTML = `
-            <div class="popularity-badge" style="color: var(--accent-primary); font-size: 0.65rem;">AFFINITY: ${song.match_score}</div>
-            <h4>${song.title}</h4>
-            <p style="font-weight: 500; color: var(--text-main);">${song.artist}</p>
-            
-            <div class="tags">
-                ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
-            </div>
-            
-            <button onclick="saveFromRec(${song.id})" style="margin-top: 1.5rem; padding: 0.6rem; font-size: 0.8rem; background: transparent; border: 1px solid var(--accent-primary); color: var(--accent-primary); border-radius: 8px;">
-                Save to Collection
-            </button>
-        `;
+        <div style="font-size:0.65rem; font-weight:800; color:var(--accent-red); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:1px;">AFFINITY: ${song.match_score}</div>
+        <h4>${song.title}</h4>
+        <div class="artist">${song.artist}</div>
+        
+        <div class="tags">
+            ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>
+        
+        <button onclick="saveFromRec(${song.id})" style="margin-top: 1.5rem; padding: 0.8rem; font-size: 0.8rem;">
+            SAVE TO ARCHIVE
+        </button>
+    `;
         list.appendChild(card);
     });
 }

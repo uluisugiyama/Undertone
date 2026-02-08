@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Profile & Library</title>
     <link rel="stylesheet" href="/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Playfair+Display:wght@700;900&family=EB+Garamond:ital,wght@0,400;1,400&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
@@ -20,49 +22,50 @@
 
         <!-- Auth Section -->
         <div id="auth-section" class="auth-container fade-in">
-            <div class="glass-card">
+            <div class="editorial-card">
                 <div class="auth-tabs">
                     <div class="auth-tab active" onclick="switchAuth('login')">Login</div>
                     <div class="auth-tab" onclick="switchAuth('register')">Register</div>
                 </div>
 
-                <header style="text-align: center; margin-bottom: 2rem;">
-                    <h2 id="auth-title">Welcome Back</h2>
-                    <p id="auth-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">Enter your credentials
-                        to continue.</p>
-                </header>
+                <div style="text-align: center; margin: 2rem 0;">
+                    <h2 id="auth-title" style="border: none;">Welcome Back</h2>
+                    <p id="auth-subtitle" style="font-family: var(--font-serif); font-style: italic;">Access the
+                        archive.</p>
+                </div>
 
                 <div id="auth-error"></div>
 
                 <div class="input-group">
-                    <label>USERNAME</label>
-                    <input type="text" id="username" placeholder="music_connoisseur" style="width: 100%;">
+                    <label>IDENTIFIER</label>
+                    <input type="text" id="username" placeholder="Username">
                 </div>
                 <div class="input-group">
-                    <label>PASSWORD</label>
-                    <input type="password" id="password" placeholder="••••••••" style="width: 100%;">
+                    <label>CREDENTIAL</label>
+                    <input type="password" id="password" placeholder="••••••••">
                 </div>
 
-                <button id="auth-submit-btn" class="btn-primary">Login to Undertone</button>
+                <button id="auth-submit-btn" style="margin-top: 1rem;">Authenticate</button>
             </div>
         </div>
 
         <!-- User Info Section (Logged In) -->
         <div id="user-info-section" style="display: none;" class="fade-in">
-            <div class="glass-card"
+            <div class="editorial-card"
                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4rem;">
                 <div>
-                    <h2 style="margin-bottom: 0.2rem;">Welcome back, <span id="display-username"
-                            style="color: var(--accent-primary);"></span></h2>
-                    <p style="color: var(--text-muted);">Your personalized musical landscape awaits.</p>
+                    <h2 style="border: none; margin-bottom: 0;">The Reader: <span id="display-username"
+                            style="color: var(--accent-red);"></span></h2>
+                    <p style="font-family: var(--font-serif); font-style: italic;">Curator of personal soundscapes.</p>
                 </div>
-                <button id="logout-btn" class="btn-logout">Logout</button>
+                <button id="logout-btn" style="width: auto; padding: 0.5rem 1.5rem;">Logout</button>
             </div>
 
             <section id="library-section">
-                <header style="margin-bottom: 2rem;">
-                    <h2>Your Collection</h2>
-                    <p style="color: var(--text-muted);">Tracks that matched your intent.</p>
+                <header style="margin-bottom: 3rem;">
+                    <h2>The Personal Collection</h2>
+                    <p style="font-family: var(--font-serif); font-style: italic;">Echoes of your discovered intents.
+                    </p>
                 </header>
                 <div id="library-list" class="results-grid">
                     <!-- Saved songs will be injected here -->
@@ -70,11 +73,10 @@
 
                 <div style="height: 6rem;"></div>
 
-                <header style="margin-bottom: 2rem;">
-                    <h2
-                        style="background: linear-gradient(to right, #fff, var(--text-muted)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
-                        Resonating Recommendations</h2>
-                    <p style="color: var(--text-muted);">Discovery curated by your unique undertone profile.</p>
+                <header style="margin-bottom: 3rem;">
+                    <h2>Editorial Recommendations</h2>
+                    <p style="font-family: var(--font-serif); font-style: italic;">Discovery curated by your unique
+                        aesthetic profile.</p>
                 </header>
                 <div id="recommendations-list" class="results-grid">
                     <!-- Recommendations will be injected here -->

@@ -5,7 +5,7 @@ function renderSongCards(songs, containerId, searchLogId = null) {
 
     songs.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'glass-card song-card';
+        card.className = 'song-card fade-in';
 
         // Handle AI Recommendations vs DB results
         const isAI = song.ai_recommendation;
@@ -14,20 +14,16 @@ function renderSongCards(songs, containerId, searchLogId = null) {
         const tagHtml = (song.tags && song.tags.length > 0) ? song.tags.map(t => `<span class="tag">${t}</span>`).join('') : '<span class="tag" style="opacity: 0.5;">Unidentified</span>';
 
         card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h4 class="song-title">${song.title}</h4>
-                    <p class="song-artist">${song.artist}</p>
-                </div>
-                <span style="font-size: 0.7rem; color: var(--accent-primary); font-weight: bold; letter-spacing: 1px;">
-                    ${isAI ? 'AI SUGGESTED' : (song.mainstream_score > 70 ? 'MAINSTREAM' : 'UNDERTONE')}
-                </span>
-            </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.8rem 0;">${metaLine}</p>
+            ${isAI ? '<div style="font-size:0.7rem; font-weight:800; color:var(--accent-red); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:1px;">Editorial Suggestion</div>' : ''}
+            <h4>${song.title}</h4>
+            <div class="artist">${song.artist}</div>
+            <div class="meta">${metaLine}</div>
             <div class="tags">
                 ${tagHtml}
             </div>
-            <button onclick="${btnAction}" class="action-btn" style="margin-top: 1.5rem; width: 100%;">Save to Collection</button>
+            <button onclick="${btnAction}" style="margin-top: 1.5rem; padding: 0.8rem; font-size: 0.8rem;">
+                SAVE TO ARCHIVE
+            </button>
         `;
         container.appendChild(card);
     });
@@ -165,14 +161,14 @@ if (externalSearchBtn) {
 
             tracks.forEach(track => {
                 const card = document.createElement('div');
-                card.className = 'glass-card song-card fade-in';
-                card.style.padding = '1rem';
+                card.className = 'song-card fade-in';
+                card.style.padding = '2rem';
                 card.innerHTML = `
-                    <h5 style="color: var(--accent-primary); margin-bottom: 0.2rem;">${track.title}</h5>
-                    <p style="font-size: 0.8rem; margin-bottom: 0.8rem;">${track.artist}</p>
-                    <button class="action-btn" onclick="saveToLibrary(null, null, '${track.artist.replace(/'/g, "\\'")}', '${track.title.replace(/'/g, "\\'")}')" 
-                            style="padding: 0.5rem; font-size: 0.8rem; width: 100%;">
-                        Save to Collection
+                    <h4>${track.title}</h4>
+                    <div class="artist">${track.artist}</div>
+                    <button onclick="saveToLibrary(null, null, '${track.artist.replace(/'/g, "\\'")}', '${track.title.replace(/'/g, "\\'")}')" 
+                            style="margin-top: 1rem; padding: 0.8rem; font-size: 0.8rem;">
+                        SAVE TO ARCHIVE
                     </button>
                 `;
                 externalResults.appendChild(card);

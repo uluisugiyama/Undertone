@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Discovery Engine</title>
     <link rel="stylesheet" href="/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Playfair+Display:wght@700;900&family=EB+Garamond:ital,wght@0,400;1,400&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
@@ -19,17 +21,20 @@
             <span id="user-display"></span>
         </nav>
 
-        <header style="margin-bottom: 3rem;">
+        <header style="margin-bottom: 4rem; text-align: center;">
+            <p
+                style="text-transform: uppercase; letter-spacing: 4px; font-weight: 800; color: var(--accent-red); margin-bottom: 1rem;">
+                Volume I • Issue I</p>
             <h1>Undertone</h1>
-            <p style="color: var(--text-muted); font-size: 1.1rem;">Find your musical match through intent and metadata.
+            <p style="font-family: var(--font-serif); font-size: 1.4rem; font-style: italic; color: var(--text-muted);">
+                A Journal of Musical Intent & Deep Discovery
             </p>
         </header>
 
-        <section class="glass-card">
-            <h3 style="margin-bottom: 1rem;">Intent-Based Discovery</h3>
-            <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem;">
-                Describe the vibe, artist, or specific metadata you're looking for.
-                Our engine will parse your intent.
+        <section class="editorial-card">
+            <h3 style="border-bottom: var(--border-thin); padding-bottom: 0.5rem;">The Dispatch: Intent Search</h3>
+            <p style="margin-bottom: 1.5rem; font-family: var(--font-serif);">
+                Speak your desired atmosphere. Our analysts will parse the metadata.
             </p>
 
             <div class="intent-wrapper">
@@ -37,29 +42,29 @@
                     placeholder='e.g. "I want a Drake song that is sad and recent with a low tempo"'></textarea>
             </div>
 
-            <div class="mode-selector" style="margin-top: 1.5rem; display: flex; gap: 0.8rem;">
-                <div class="mode-chip active" data-mode="all">Global Discovery</div>
-                <div class="mode-chip" data-mode="mainstream">Mainstream</div>
-                <div class="mode-chip" data-mode="niche">Undertone (Niche)</div>
+            <div class="mode-selector" style="margin-top: 1.5rem;">
+                <div class="mode-chip active" data-mode="all">The Archive</div>
+                <div class="mode-chip" data-mode="mainstream">Popular Press</div>
+                <div class="mode-chip" data-mode="niche">Undertone Niche</div>
             </div>
 
             <div style="margin-top: 1.5rem;">
-                <button id="search-btn" style="padding: 1.2rem; font-size: 1.1rem; letter-spacing: 1px;">
-                    EXTRACT UNDERTONE
+                <button id="search-btn">
+                    ANALYZE INTENT
                 </button>
             </div>
         </section>
 
-        <section class="glass-card" style="margin-top: 2rem;">
-            <h3>Global Search</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Don't see what you want? Search
-                the global database to add it.</p>
-            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                <input type="text" id="external-search-input" placeholder="Search artist or song...">
-                <button id="external-search-btn" style="width: auto; padding: 0 1.5rem; margin-top: 0;">Search
-                    Global</button>
+        <section class="editorial-card" style="margin-top: 3rem;">
+            <h3>Global Wire Service</h3>
+            <p style="font-family: var(--font-serif); margin-bottom: 1rem;">Extend your reach beyond our local database.
+            </p>
+            <div style="display: flex; gap: 0; border: var(--border-thick);">
+                <input type="text" id="external-search-input" placeholder="Artist or track name..."
+                    style="border: none; flex-grow: 1;">
+                <button id="external-search-btn" style="width: auto; padding: 0 2rem;">Search</button>
             </div>
-            <div id="external-results" class="results-grid">
+            <div id="external-results" class="results-grid" style="border: none;">
                 <!-- External search results will appear here -->
             </div>
         </section>
