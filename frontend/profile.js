@@ -206,16 +206,21 @@ async function loadRecommendations() {
     songs.forEach(song => {
         const card = document.createElement('div');
         card.className = 'song-card fade-in';
+
+        // Escape single quotes for use in onclick
+        const escapedArtist = (song.artist || "").replace(/'/g, "\\'");
+        const escapedTitle = (song.title || "").replace(/'/g, "\\'");
+
         card.innerHTML = `
-        <div style="font-size:0.65rem; font-weight:800; color:var(--accent-red); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:1px;">AFFINITY: ${song.match_score}</div>
+        <div style="font-size:0.65rem; font-weight:800; color:var(--accent-red); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:1px;">MATCH: ${song.match_score || "Vibe Match"}</div>
         <h4>${song.title}</h4>
         <div class="artist">${song.artist}</div>
         
         <div class="tags">
-            ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+            ${(song.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}
         </div>
         
-        <button onclick="saveFromRec(${song.id})" style="margin-top: 1.5rem; padding: 0.8rem; font-size: 0.8rem;">
+        <button onclick="saveFromRec(${song.id || 'null'}, '${escapedArtist}', '${escapedTitle}')" style="margin-top: 1.5rem; padding: 0.8rem; font-size: 0.8rem;">
             SAVE TO ARCHIVE
         </button>
     `;
@@ -223,11 +228,21 @@ async function loadRecommendations() {
     });
 }
 
-async function saveFromRec(songId) {
+async function saveFromRec(songId, artist = null, title = null) {
+    const payload = {};
+    if (songId) {
+        payload.song_id = songId;
+    } else if (artist && title) {
+        payload.artist = artist;
+        payload.title = title;
+    } else {
+        return;
+    }
+
     const response = await fetch('/library/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ song_id: songId })
+        body: JSON.stringify(payload)
     });
     if (response.ok) {
         loadLibrary();

@@ -881,25 +881,29 @@ def get_recommendations():
     
     # 3. Candidate Selection: Songs in database NOT in library
     user_library_ids = [entry.song_id for entry in UserLibrary.query.filter_by(user_id=user_id).all()]
-    potential_matches = Song.query.filter(Song.id.notin_(user_library_ids)).limit(200).all()
+    potential_matches = Song.query.filter(Song.id.notin_(user_library_ids)).limit(250).all()
     
     scored_recs = []
     for song in potential_matches:
         # A. Vector Similarity Score (Vibe Match)
         analysis = SongAnalysis.query.filter_by(song_id=song.id).first()
-        sim_score, _ = DiscoveryEngine.calculate_similarity(analysis, target_vector)
+        if analysis:
+            sim_score, _ = DiscoveryEngine.calculate_similarity(analysis, target_vector)
+        else:
+            # Fallback: Neutral similarity score if analysis is missing
+            sim_score = 0.3 if target_vector else 0.1
         
         # B. Metadata/Tag Boosts
         song_tags = [t.tag_name.lower() for t in song.tags]
         tag_overlap = set(top_tag_names).intersection(set(song_tags))
-        tag_boost = len(tag_overlap) * 0.1 # 10% boost per shared tag
+        tag_boost = len(tag_overlap) * 0.15 # 15% boost per shared tag
         
-        genre_boost = 0.2 if song.genre == fav_genre else 0
+        genre_boost = 0.25 if song.genre == fav_genre else 0
         
         # Combined Match Score (0.0 - 1.0+)
         final_match_score = sim_score + tag_boost + genre_boost
         
-        if final_match_score > 0.4: # Only show decent matches
+        if final_match_score > 0.3: # Lower threshold for discovery
             song_dict = song.to_dict()
             song_dict['match_score'] = round(final_match_score * 10, 1) # Internal scale 1-10
             # Add a small random jitter to break ties and keep UI fresh
@@ -922,6 +926,34 @@ def get_recommendations():
         
         if len(final_recs) >= 12: 
             break
+
+    # 5. External Discovery Fallback (If local results are sparse)
+    if len(final_recs) < 6 and LASTFM_API_KEY:
+        try:
+            client = LastFMClient(LASTFM_API_KEY)
+            # Find the top rated or most recent song to use as a seed
+            seed_song_id = next(iter(user_library_ids), None)
+            if seed_song_id:
+                seed_song = Song.query.get(seed_song_id)
+                if seed_song:
+                    external_similars = client.get_similar_tracks(seed_song.artist, seed_song.title)
+                    existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in final_recs)
+                    library_keys = set(f"{Song.query.get(sid).artist.lower()}|{Song.query.get(sid).title.lower()}" for sid in user_library_ids if Song.query.get(sid))
+                    
+                    for res in external_similars:
+                        key = f"{res['artist'].lower()}|{res['title'].lower()}"
+                        if key not in existing_keys and key not in library_keys:
+                            final_recs.append({
+                                "artist": res['artist'],
+                                "title": res['title'],
+                                "ai_recommendation": True,
+                                "genre": "External Discovery",
+                                "match_score": 5.0,
+                                "tags": ["Global Discovery", "Similar Vibes"]
+                            })
+                            if len(final_recs) >= 12: break
+        except Exception as e:
+            print(f"External recommendation fallback failed: {e}")
             
     return jsonify(final_recs)
 
