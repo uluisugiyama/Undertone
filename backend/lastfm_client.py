@@ -99,3 +99,20 @@ class LastFMClient:
         except Exception as e:
             print(f"Error searching for track {query}: {e}")
             return []
+    def get_global_top_tracks(self, limit=50, page=1):
+        params = {
+            "method": "chart.getTopTracks",
+            "api_key": self.api_key,
+            "format": "json",
+            "limit": limit,
+            "page": page
+        }
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            tracks = data.get('tracks', {}).get('track', [])
+            return [{"artist": t['artist']['name'], "title": t['name']} for t in tracks]
+        except Exception as e:
+            print(f"Error fetching global top tracks: {e}")
+            return []

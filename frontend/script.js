@@ -1,58 +1,77 @@
+// Helper to render song cards
+function renderSongCards(songs, containerId) {
+    const list = document.getElementById(containerId);
+    list.innerHTML = '';
+
+    songs.forEach(song => {
+        const card = document.createElement('div');
+        card.className = 'glass-card song-card fade-in';
+
+        const popularityTag = song.mainstream_score > 70 ? 'MAINSTREAM' : (song.mainstream_score < 40 ? 'NICHE' : 'BALANCED');
+
+        card.innerHTML = `
+            <div class="popularity-badge">${popularityTag}</div>
+            <h4>${song.title}</h4>
+            <p style="font-weight: 500; color: var(--text-main);">${song.artist}</p>
+            <p style="margin-top: 0.5rem; font-size: 0.8rem;">${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB</p>
+            
+            <div class="tags">
+                ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+            </div>
+            
+            <button class="save-btn" onclick="saveToLibrary(${song.id})" style="margin-top: 1.5rem; padding: 0.6rem; font-size: 0.9rem;">
+                Save to Collection
+            </button>
+        `;
+        list.appendChild(card);
+    });
+}
+
+async function loadExploreSongs() {
+    const resultsList = document.getElementById('results-list');
+    const resultsTitle = document.getElementById('results-title');
+
+    resultsTitle.innerText = "Library Exploration";
+    resultsTitle.style.display = 'block';
+    resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Curating a selection of tracks...</div>';
+
+    try {
+        const response = await fetch('/songs/explore');
+        const songs = await response.json();
+        renderSongCards(songs, 'results-list');
+    } catch (err) {
+        console.error(err);
+        resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Unable to load library.</div>';
+    }
+}
+
 document.getElementById('search-btn').addEventListener('click', async () => {
-    const genre = document.getElementById('genre').value;
-    const tempo = document.getElementById('tempo').value;
-    const loudness = document.getElementById('loudness').value;
-    const popularity = document.getElementById('popularity').value;
+    const intent = document.getElementById('intent-input').value;
 
     const resultsList = document.getElementById('results-list');
     const resultsTitle = document.getElementById('results-title');
 
-    resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Searching for your undertone...</div>';
+    if (!intent) return;
+
+    resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Parsing your musical intent...</div>';
+    resultsTitle.innerText = "Analyzed Results";
     resultsTitle.style.display = 'block';
 
-    const params = new URLSearchParams();
-    if (genre) params.append('genre', genre);
-    if (tempo !== 'any') params.append('tempo', tempo);
-    if (loudness !== 'any') params.append('loudness', loudness);
-    if (popularity !== 'all') params.append('popularity', popularity);
-
     try {
-        const response = await fetch(`/search/objective?${params.toString()}`, {
+        const response = await fetch(`/search/intent?intent=${encodeURIComponent(intent)}`, {
             headers: { 'Content-Type': 'application/json' }
         });
         const songs = await response.json();
 
-        resultsList.innerHTML = '';
         if (songs.length === 0) {
-            resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">No matches found. Try widening your filters.</div>';
+            resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Your undertone is highly unique. No matches found for this specific intent.</div>';
             return;
         }
 
-        songs.forEach(song => {
-            const card = document.createElement('div');
-            card.className = 'glass-card song-card';
-
-            const popularityTag = song.mainstream_score > 70 ? 'MAINSTREAM' : (song.mainstream_score < 40 ? 'NICHE' : 'BALANCED');
-
-            card.innerHTML = `
-                <div class="popularity-badge">${popularityTag}</div>
-                <h4>${song.title}</h4>
-                <p style="font-weight: 500; color: var(--text-main);">${song.artist}</p>
-                <p style="margin-top: 0.5rem; font-size: 0.8rem;">${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB</p>
-                
-                <div class="tags">
-                    ${song.tags.map(t => `<span class="tag">${t}</span>`).join('')}
-                </div>
-                
-                <button class="save-btn" onclick="saveToLibrary(${song.id})" style="margin-top: 1.5rem; padding: 0.6rem; font-size: 0.9rem;">
-                    Save to Collection
-                </button>
-            `;
-            resultsList.appendChild(card);
-        });
+        renderSongCards(songs, 'results-list');
     } catch (err) {
         console.error(err);
-        resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">Search failed. Please try again.</div>';
+        resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">Search failed. Analysis engine offline.</div>';
     }
 });
 
@@ -99,7 +118,7 @@ if (externalSearchBtn) {
 
             tracks.forEach(track => {
                 const card = document.createElement('div');
-                card.className = 'glass-card song-card';
+                card.className = 'glass-card song-card fade-in';
                 card.style.padding = '1rem';
                 card.innerHTML = `
                     <h5 style="color: var(--accent-primary); margin-bottom: 0.2rem;">${track.title}</h5>
@@ -128,7 +147,6 @@ async function importTrack(artist, title) {
         const song = await response.json();
         if (response.status === 201 || response.status === 200) {
             alert(`"${song.title}" imported successfully!`);
-            // Optionally trigger a local search to show it
         } else {
             alert('Import failed: ' + (song.error || 'Unknown error'));
         }
@@ -151,3 +169,4 @@ async function checkAuth() {
 }
 
 checkAuth();
+loadExploreSongs();

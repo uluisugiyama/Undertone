@@ -19,7 +19,8 @@ def enrich_songs():
     client = LastFMClient(LASTFM_API_KEY)
     
     with app.app_context():
-        songs = Song.query.all()
+        # Only enrich songs that haven't been enriched yet (mainstream_score is 0)
+        songs = Song.query.filter_by(mainstream_score=0).all()
         print(f"Starting enrichment for {len(songs)} songs...")
         
         for song in songs:
@@ -47,7 +48,7 @@ def enrich_songs():
             
             db.session.commit()
             # Brief sleep to be polite to the API
-            time.sleep(0.5)
+            time.sleep(0.2)
 
         print("Enrichment complete.")
 

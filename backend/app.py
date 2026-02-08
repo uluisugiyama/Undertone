@@ -2,7 +2,8 @@ from flask import Flask, jsonify, request, session, send_from_directory
 from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, Song, User, UserLibrary, UserRating, PersonalTrending
+from sqlalchemy import or_
+from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag
 from music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
 import random
@@ -207,58 +208,58 @@ def rate_song():
     db.session.commit()
     return jsonify({"message": "Rating saved"}), 201
 
-@app.route('/search/objective')
-def search_objective():
-    # Get query parameters
-    genre = request.args.get('genre')
-    tempo = request.args.get('tempo') # 'fast', 'slow', or 'any'
-    loudness = request.args.get('loudness') # 'heavy', 'mellow', or 'any'
-    bpm_min = request.args.get('bpm_min', type=int)
-    bpm_max = request.args.get('bpm_max', type=int)
-    year_min = request.args.get('year_min', type=int)
-    year_max = request.args.get('year_max', type=int)
-    popularity = request.args.get('popularity', 'all') # 'all', 'mainstream', 'niche'
+@app.route('/search/intent')
+def search_intent():
+    intent = request.args.get('intent', '').lower()
+    if not intent:
+        return jsonify([])
 
     query = Song.query
-
-    if genre:
-        query = query.filter(Song.genre == genre)
-    if bpm_min:
-        query = query.filter(Song.bpm >= bpm_min)
-    if bpm_max:
-        query = query.filter(Song.bpm <= bpm_max)
-    if year_min:
-        query = query.filter(Song.year >= year_min)
-    if year_max:
-        query = query.filter(Song.year <= year_max)
     
-    # Popularity Filtering
-    if popularity == 'mainstream':
-        query = query.filter(Song.mainstream_score >= 70)
-    elif popularity == 'niche':
-        query = query.filter(Song.mainstream_score < 40)
+    # 1. Temporal Intent (Recent vs Old)
+    if any(word in intent for word in ['recent', 'new', 'modern', 'latest', '202']):
+        query = query.filter(Song.year >= 2018)
+    elif any(word in intent for word in ['old', 'classic', 'vintage', 'throwback', '90s', '80s']):
+        query = query.filter(Song.year < 2010)
 
-    songs = query.all()
+    # 2. Tempo Intent
+    if any(word in intent for word in ['low tempo', 'slow', 'chill', 'relaxed', 'calm']):
+        query = query.filter(Song.bpm < 100)
+    elif any(word in intent for word in ['high tempo', 'fast', 'energetic', 'upbeat', 'hype']):
+        query = query.filter(Song.bpm >= 125)
 
-    # Apply manual filters for tempo and loudness based on music_standards
-    filtered_results = []
-    for song in songs:
-        match_tempo = True
-        if tempo == 'fast':
-            match_tempo = is_fast_tempo(song.bpm)
-        elif tempo == 'slow':
-            match_tempo = not is_fast_tempo(song.bpm)
+    # 3. Loudness Intent
+    if any(word in intent for word in ['loud', 'heavy', 'aggressive', 'hard']):
+        query = query.filter(Song.decibel_peak > -10.0)
+    elif any(word in intent for word in ['soft', 'quiet', 'mellow', 'smooth']):
+        query = query.filter(Song.decibel_peak <= -15.0)
 
-        match_loudness = True
-        if loudness == 'heavy':
-            match_loudness = is_heavy(song.decibel_peak)
-        elif loudness == 'mellow':
-            match_loudness = not is_heavy(song.decibel_peak)
+    # 4. Keyword Extraction (Artist, Genre, Tags)
+    # Filter out common "stop words" from the intent
+    stop_words = {'i', 'want', 'a', 'song', 'that', 'is', 'and', 'with', 'the', 'sng', 'in', 'of', 'for', 'to', 'not'}
+    tokens = [t.strip('?!.,') for t in intent.split() if t not in stop_words]
+    
+    for token in tokens:
+        # Avoid re-applying keywords already handled by numeric filters
+        if token in ['recent', 'new', 'old', 'slow', 'fast', 'loud', 'quiet']:
+            continue
+            
+        search_filter = or_(
+            Song.artist.ilike(f"%{token}%"),
+            Song.title.ilike(f"%{token}%"),
+            Song.genre.ilike(f"%{token}%"),
+            Song.tags.any(SongTag.tag_name.ilike(f"%{token}%"))
+        )
+        query = query.filter(search_filter)
 
-        if match_tempo and match_loudness:
-            filtered_results.append(song.to_dict())
+    songs = query.limit(50).all()
+    return jsonify([song.to_dict() for song in songs])
 
-    return jsonify(filtered_results)
+@app.route('/songs/explore')
+def explore_songs():
+    # Get 30 random songs for the 'Explore' section
+    songs = Song.query.order_by(db.func.random()).limit(30).all()
+    return jsonify([s.to_dict() for s in songs])
 
 @app.route('/recommendations')
 def get_recommendations():

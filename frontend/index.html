@@ -26,53 +26,23 @@
         </header>
 
         <section class="glass-card">
-            <h3>Refine Your Search</h3>
-            <div class="filter-panel">
-                <div class="filter-group">
-                    <label for="genre">Genre</label>
-                    <select id="genre">
-                        <option value="">Any Style</option>
-                        <option value="Punk Rock">Punk Rock</option>
-                        <option value="Metalcore">Metalcore</option>
-                        <option value="Synthpop">Synthpop</option>
-                        <option value="Techno">Techno</option>
-                        <option value="Ambient">Ambient</option>
-                        <option value="Grunge">Grunge</option>
-                        <option value="Lo-fi">Lo-fi</option>
-                        <option value="Trap">Trap</option>
-                        <option value="R&B">R&B</option>
-                    </select>
-                </div>
+            <h3 style="margin-bottom: 1rem;">Intent-Based Discovery</h3>
+            <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem;">
+                Describe the vibe, artist, or specific metadata you're looking for.
+                Our engine will parse your intent.
+            </p>
 
-                <div class="filter-group">
-                    <label for="tempo">Tempo</label>
-                    <select id="tempo">
-                        <option value="any">Any Tempo</option>
-                        <option value="fast">Fast (>120 BPM)</option>
-                        <option value="slow">Slow (≤120 BPM)</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label for="loudness">Loudness</label>
-                    <select id="loudness">
-                        <option value="any">Any Level</option>
-                        <option value="heavy">Heavy (>-10dB)</option>
-                        <option value="mellow">Mellow (≤-10dB)</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label for="popularity">Density</label>
-                    <select id="popularity">
-                        <option value="all">Any Popularity</option>
-                        <option value="mainstream">Mainstream (Top Hits)</option>
-                        <option value="niche">Niche (Underground)</option>
-                    </select>
-                </div>
+            <div class="intent-wrapper">
+                <textarea id="intent-input"
+                    placeholder='e.g. "I want a Drake song that is sad and recent with a low tempo"'
+                    style="width: 100%; min-height: 120px; font-size: 1.2rem; padding: 1.5rem; border-radius: 16px; border: 1px solid var(--glass-border); background: var(--bg-input); color: var(--text-main); font-family: inherit; resize: none; transition: var(--transition-smooth);"></textarea>
             </div>
 
-            <button id="search-btn">Discover My Undertone</button>
+            <div style="margin-top: 1.5rem;">
+                <button id="search-btn" style="padding: 1.2rem; font-size: 1.1rem; letter-spacing: 1px;">
+                    EXTRACT UNDERTONE
+                </button>
+            </div>
         </section>
 
         <section class="glass-card" style="margin-top: 2rem;">
