@@ -7,14 +7,19 @@ function renderSongCards(songs, containerId, searchLogId = null) {
         const card = document.createElement('div');
         card.className = 'song-card fade-in';
 
-        // Handle AI Recommendations vs DB results
         const isAI = song.ai_recommendation;
         const btnAction = `saveToLibrary(${song.id || 'null'}, ${searchLogId}, '${song.artist.replace(/'/g, "\\'")}', '${song.title.replace(/'/g, "\\'")}')`;
         const metaLine = `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
         const tagHtml = (song.tags && song.tags.length > 0) ? song.tags.map(t => `<span class="tag">${t}</span>`).join('') : '<span class="tag" style="opacity: 0.5;">Unidentified</span>';
 
+        // Objective vs Subjective reasoning
+        let reasoning = isAI ? 'Global Wire Service: AI Suggestion' : 'Local Archive: Metric Consistency';
+        if (song.match_type === 'relaxed') reasoning = 'Semantic Match: Broad Discovery';
+
         card.innerHTML = `
-            ${isAI ? '<div style="font-size:0.7rem; font-weight:800; color:var(--accent-red); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:1px;">Editorial Suggestion</div>' : ''}
+            <div style="font-size:0.65rem; font-weight:800; color:var(--accent-red); margin-bottom:0.8rem; text-transform:uppercase; letter-spacing:1px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
+                ${reasoning}
+            </div>
             <h4>${song.title}</h4>
             <div class="artist">${song.artist}</div>
             <div class="meta">${metaLine}</div>

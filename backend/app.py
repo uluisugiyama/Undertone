@@ -133,6 +133,22 @@ def analyze_db_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/admin/debug_stats')
+def debug_stats():
+    song_count = Song.query.count()
+    tag_count = SongTag.query.count()
+    analysis_count = SongAnalysis.query.count()
+    
+    songs = Song.query.limit(5).all()
+    song_list = [f"{s.artist} - {s.title} (Analysis: {'Yes' if SongAnalysis.query.filter_by(song_id=s.id).first() else 'No'})" for s in songs]
+    
+    return jsonify({
+        "song_count": song_count,
+        "tag_count": tag_count,
+        "analysis_count": analysis_count,
+        "sample_songs": song_list
+    })
+
 @app.route('/admin/ingest_complete')
 def ingest_complete_endpoint():
     try:
@@ -144,15 +160,25 @@ def ingest_complete_endpoint():
         from backend.ingest_data import seed_real_data
         from backend.enrich_data import enrich_songs
         from backend.backfill_analysis import backfill
+        import threading
+
+        def run_pipeline():
+            with app.app_context():
+                print("BACKGROUND: Starting Complete Pipeline...")
+                try:
+                    seed_real_data()
+                    enrich_songs()
+                    backfill()
+                    print("BACKGROUND: Pipeline Success!")
+                except Exception as e:
+                    print(f"BACKGROUND: Pipeline Failed: {e}")
+
+        thread = threading.Thread(target=run_pipeline)
+        thread.start()
         
-        print("Starting Complete Pipeline...")
-        seed_real_data()
-        enrich_songs()
-        backfill()
-        
-        return jsonify({"message": "Complete Pipeline Success! App is now fully optimized."}), 200
+        return jsonify({"message": "Background Pipeline Started! Monitoring progress via /admin/debug_stats. Expected completion: 3-5 minutes."}), 202
     except Exception as e:
-        return jsonify({"error": f"Pipeline failed: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to start pipeline: {str(e)}"}), 500
 
 @app.route('/')
 def serve_index():
@@ -177,22 +203,26 @@ def search_external():
 def enrich_song_analysis(song):
     """
     Phase 19: Deep Music Analysis
-    Uses Gemini to infer 9-dimensional feature vectors.
+    Uses Gemini to infer 9-dimensional feature vectors based on university-level standards.
     """
     prompt = f"""
-    Analyze the song "{song.title}" by "{song.artist}".
-    Provide a deep musicological analysis with the following metrics as JSON.
-    Strictly follow the JSON structure.
+    Analyze the song "{song.title}" by "{song.artist}" using academic musicological standards (referencing standards from Harvard, Stanford, etc.). 
+    Provide a deep analysis with the following metrics as JSON.
     
+    Standards to apply:
+    - Tempo: Slow (<90 BPM), Medium (90-125 BPM), Up-tempo/Fast (>125 BPM).
+    - Vocal Intensity: Screaming is defined as peak-intensity vocalizations (sustained decibel peaks > -6dB relative to mean).
+    - Complexity: Rhythmic complexity should consider polyrhythms, syncopation, and non-4/4 time signatures.
+
     {{
       "tempo_feel": "slow" | "medium" | "fast",
-      "rhythmic_complexity": 0.0 to 1.0 (0=Simple 4/4, 1=Complex/Polyrythmic),
+      "rhythmic_complexity": 0.0 to 1.0 (0=Simple 4/4, 1=Complex/Polyrhythmic),
       "vocal_style": "clean" | "raspy" | "screaming" | "fluid" | "instrumental",
       "vocal_presence": 0.0 to 1.0 (0=Instrumental, 1=Vocal Dominant),
       "dark_bright": 0.0 to 1.0 (0=Dark/Melancholic, 1=Bright/Happy),
       "calm_energetic": 0.0 to 1.0 (0=Calm/Ambient, 1=High Energy/Aggressive),
       "production_quality": 0.0 to 1.0 (0=Lo-fi/Raw, 1=Hi-fi/Polished),
-      "genre_distribution": {{ "GenreName": 0.X }} (Must sum roughly to 1.0)
+      "genre_distribution": {{ "GenreName": 0.X }} 
     }}
     Return ONLY JSON.
     """
@@ -633,7 +663,7 @@ def search_intent():
         query = query.filter(or_(*genre_filters, *tag_filters))
         filters_applied = True
 
-    # 4. Keyword/Mood matching
+    # 4. Keyword/Mood matching (Subjective Consensus Layer)
     mood = parsed_intent.get('mood')
     keywords = parsed_intent.get('keywords', [])
     search_terms = keywords + ([mood] if mood else [])
@@ -641,9 +671,10 @@ def search_intent():
     if search_terms:
         filters_applied = True
         for kw in search_terms:
-            # We separate Artist/Title keywords from Genre/Tag keywords to avoid "Rock With Me" dominance
+            # PHASE 18: SUBJECTIVE CONSENSUS
+            # Only match keywords in tags if they have count >= 3 (unless the user has explicitly added them)
             query = query.filter(or_(
-                Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%")),
+                Song.tags.any(and_(SongTag.tag_name.ilike(f"%{kw}%"), SongTag.count >= 3)),
                 # Only match artist/title if it's not a generic genre name
                 or_(
                     Song.artist.ilike(f"%{kw}%"),
@@ -655,8 +686,8 @@ def search_intent():
     feature_constraints = parsed_intent.get('feature_constraints', [])
     if feature_constraints:
         print(f"DEBUG: Applying {len(feature_constraints)} Deep Feature Constraints")
-        # Explicitly join SongAnalysis for vector filtering
-        query = query.join(SongAnalysis)
+        # Use LEFT OUTER JOIN so songs without analysis yet still appear but can be filtered/scored
+        query = query.outerjoin(SongAnalysis)
         filters_applied = True
         
         for constraint in feature_constraints:
@@ -667,90 +698,31 @@ def search_intent():
                 col = getattr(SongAnalysis, feature, None)
                 if col:
                     if 'min' in constraint:
-                        query = query.filter(col >= constraint['min'])
+                        query = query.filter(or_(col >= constraint['min'], col == None))
                     if 'max' in constraint:
-                        query = query.filter(col <= constraint['max'])
+                        query = query.filter(or_(col <= constraint['max'], col == None))
             
             # Categorical Values (Enum)
             if 'values' in constraint:
                 col = getattr(SongAnalysis, feature, None)
                 if col:
-                    query = query.filter(col.in_(constraint['values']))
+                    query = query.filter(or_(col.in_(constraint['values']), col == None))
 
     # CRITICAL FIX: Fallback
     if not filters_applied and intent:
         print("DEBUG: Fallback logic triggered!")
         query = query.filter(or_(
             Song.genre.ilike(f"%{intent}%"),
-            Song.tags.any(SongTag.tag_name.ilike(f"%{intent}%")),
+            Song.tags.any(and_(SongTag.tag_name.ilike(f"%{intent}%"), SongTag.count >= 3)),
             Song.artist.ilike(f"%{intent}%"),
             Song.title.ilike(f"%{intent}%")
         ))
         
     print(f"DEBUG: Parsed Intent: {parsed_intent}")
     print(f"DEBUG: Filters Applied: {filters_applied}")
-    print(f"DEBUG: Query SQL: {query}")
-
+    
     # --- TWO-PASS SEARCH STRATEGY ---
-    # Pass 1: Strict Query (All filters applied)
     db_songs_strict = query.limit(100).all()
-    
-    # Convert to dict and assign High Match Score
-    all_songs = []
-    found_ids = set()
-    
-    for s in db_songs_strict:
-        s_dict = s.to_dict()
-        s_dict['match_type'] = 'strict'
-        s_dict['base_score'] = 1000 # Ensure strict matches are always on top
-        all_songs.append(s_dict)
-        found_ids.add(s.id)
-        
-    # Pass 2: Relaxed Query (If results are low)
-    # Fetch partial matches if we have fewer than 50 results
-    if len(all_songs) < 50 and (parsed_intent.get('genres') or parsed_intent.get('mood') or parsed_intent.get('keywords')):
-        print(f"DEBUG: Triggering Relaxed Search. Found {len(all_songs)} strict matches.")
-        
-        relaxed_query = Song.query
-        
-        # Apply Mode Filter to relaxed query too
-        if mode == 'mainstream':
-            relaxed_query = relaxed_query.filter(Song.mainstream_score >= 70)
-        elif mode == 'niche':
-            relaxed_query = relaxed_query.filter(Song.mainstream_score < 70)
-            
-        # Broad "OR" Filter
-        conditions = []
-        
-        # 1. Genres
-        if parsed_intent.get('genres'):
-            for g in parsed_intent['genres']:
-                conditions.append(Song.genre.ilike(f"%{g}%"))
-                conditions.append(Song.tags.any(SongTag.tag_name.ilike(f"%{g}%")))
-        
-        # 2. Mood/Keywords
-        search_terms = parsed_intent.get('keywords', []) + ([parsed_intent['mood']] if parsed_intent.get('mood') else [])
-        for kw in search_terms:
-            conditions.append(Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%"))) 
-            # Note: We exclude Artist/Title from relaxed generally to avoid noise, 
-            # unless the result count is VERY low. Let's keep it semantic.
-            
-        if conditions:
-            relaxed_query = relaxed_query.filter(or_(*conditions))
-            # Exclude already found
-            if found_ids:
-                relaxed_query = relaxed_query.filter(~Song.id.in_(found_ids))
-                
-            # Limit relaxed results
-            db_songs_relaxed = relaxed_query.limit(50 - len(all_songs)).all()
-            
-            for s in db_songs_relaxed:
-                s_dict = s.to_dict()
-                s_dict['match_type'] = 'relaxed'
-                s_dict['base_score'] = 500 # Baseline for partially matched (Higher than 0 to prioritize over external)
-                all_songs.append(s_dict)
-                
-    print(f"DEBUG: Total Songs Found: {len(all_songs)}")
     
     # 5. External Discovery
     ext_query = parsed_intent.get('external_search_query')
@@ -776,70 +748,51 @@ def search_intent():
                 })
                 existing_keys.add(key)
 
-    # 6. RE-RANKING FOR PERSONALIZATION & CROWD WISDOM
-    def calculate_relevance(song_dict):
-        score = 0
-        # Boost if in user's favorite genre
-        if user_profile['fav_genre'] and song_dict['genre'] == user_profile['fav_genre']:
-            score += 5
-            
-        # Boost based on tag overlap with User Profile
-        if 'tags' in song_dict: 
-            # 6a. Personal Profile Overlap
-            overlap = set(user_profile['top_tags']).intersection(set(song_dict['tags']))
-            score += len(overlap)
-            
-            # 6b. PHASE 18: CROWD WISDOM BOOST
-            # If the song has tags matching the current search intent, boost by their count/consensus
-            search_genres = [g.lower() for g in parsed_intent.get('genres', [])]
-            search_keywords = [k.lower() for k in parsed_intent.get('keywords', [])]
-            active_terms = set(search_genres + search_keywords)
-            
-            # We need to fetch the actual count from the DB for these specific tags
-            # Since song_dict['tags'] is just a list of strings, we query the count efficiently
-            # Optimization: We already loaded tags in to_dict, but not counts.
-            # To avoid N+1 queries during sorting, we rely on a heuristic or pre-fetch.
-            # For POC, we'll do a lightweight check if we are in a loop (mostly fine for 50 items)
-            # OR better: The query above selected songs. We trust the sort.
-            pass 
+    # 6. RE-RANKING FOR PERSONALIZATION & SHARED ACTIVITY
+    shared_hits = {}
+    if intent:
+        hist_hits = SearchLog.query.filter(
+            SearchLog.intent.ilike(f"%{intent}%"),
+            SearchLog.selected_song_id != None
+        ).all()
+        for hit in hist_hits:
+            shared_hits[hit.selected_song_id] = shared_hits.get(hit.selected_song_id, 0) + 1
 
-        elif song_dict.get('ai_recommendation'):
-            score += 1 
+    personal_trending_ids = {}
+    if user_id:
+        pt = PersonalTrending.query.filter_by(user_id=user_id).all()
+        personal_trending_ids = {item.song_id: item.engagement_count for item in pt}
+
+    def calculate_relevance(song_dict):
+        score = song_dict.get('base_score', 0)
+        sid = song_dict.get('id')
+        
+        if user_profile['fav_genre'] and song_dict['genre'] == user_profile['fav_genre']:
+            score += 50
+            
+        if sid in shared_hits:
+            score += shared_hits[sid] * 15 # Strengthen shared knowledge
+            
+        if sid in personal_trending_ids:
+            score += personal_trending_ids[sid] * 5
+            
+        if 'tags' in song_dict:
+            # Personal Profile Overlap
+            overlap = set(user_profile['top_tags']).intersection(set(song_dict['tags']))
+            score += len(overlap) * 2
+            
+            # Semantic Consensus Boost
+            active_terms = set([g.lower() for g in parsed_intent.get('genres', [])] + [k.lower() for k in parsed_intent.get('keywords', [])])
+            for t in song_dict['tags']:
+                if t.lower() in active_terms:
+                    score += 5 # Direct semantic match boost
             
         return score
 
-    # Optimized Crowd Wisdom Sort:
-    # Fetch Counts for relevant tags for these 50 songs in one go? 
-    # Or just iterate. define helper.
+    all_songs.sort(key=calculate_relevance, reverse=True)
     
-    song_ids = [s['id'] for s in all_songs if 'id' in s]
-    if song_ids:
-        # Get all tags for these songs that match current intent
-        relevant_terms = [t.lower() for t in (parsed_intent.get('genres', []) + parsed_intent.get('keywords', []))]
-        if relevant_terms:
-            boosts = {} # {song_id: total_count_boost}
-            # Select sum of counts where tag_name in terms
-            rows = db.session.query(SongTag.song_id, db.func.sum(SongTag.count)).filter(
-                SongTag.song_id.in_(song_ids),
-                SongTag.tag_name.in_(relevant_terms)
-            ).group_by(SongTag.song_id).all()
-            
-            for sid, count_sum in rows:
-                boosts[sid] = count_sum if count_sum else 0
-                
-            # Update scores
-            for s in all_songs:
-                if s.get('id') in boosts:
-                    # Logarithmic boost to prevent one super-tag dominating? 
-                    # No, linear is fine for "Crowd Wisdom" - 50 people saying "Rock" should matter.
-                    s['crowd_score'] = boosts[s['id']]
-                else:
-                    s['crowd_score'] = 0
-
-    all_songs.sort(key=lambda s: s.get('base_score', 0) + calculate_relevance(s) + (s.get('crowd_score', 0) * 0.5), reverse=True)
-
     return jsonify({
-        "songs": all_songs,  # Returned full list (strict + relaxed)
+        "songs": all_songs[:50],
         "search_log_id": new_log.id,
         "parsed_intent": parsed_intent 
     })
