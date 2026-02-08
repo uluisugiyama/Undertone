@@ -624,44 +624,62 @@ def search_intent():
     
     target_vector, matched_atomized = FeatureDictionary.expand_intent(search_keywords)
     
-    # 3. Broad Candidate Selection
-    query = Song.query.outerjoin(SongAnalysis)
+    # 3. Broad Candidate Selection (PHASE 21: Diversity Matching)
+    # We combine 3 pools:
+    # A. Targeted Metadata Candidates (Small Pool)
+    # B. Explicit Genre Candidates (Softened)
+    # C. Random "Discovery" Samples (Vibe matching across any genre)
+    
+    candidate_ids = set()
+    query_base = Song.query.outerjoin(SongAnalysis)
     
     # Apply Basic Mode Filters (Hard Constraints)
     mode = request.args.get('mode', 'all')
     if mode == 'mainstream':
-        query = query.filter(Song.mainstream_score >= 70)
+        query_base = query_base.filter(Song.mainstream_score >= 70)
     elif mode == 'niche':
-        query = query.filter(Song.mainstream_score < 70)
-        
-    # Metadata Optimization (Artist/Genre)
+        query_base = query_base.filter(Song.mainstream_score < 70)
+
+    # Pool A: Strict Artist/Metadata matches
     if parsed_intent.get('artist'):
-        query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
+        hits = query_base.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%")).limit(100).all()
+        candidate_ids.update(s.id for s in hits)
+
+    # Pool B: Genre matches (Limited to 100 to leave room for others)
     if parsed_intent.get('genres'):
-        query = query.filter(or_(*[Song.genre.ilike(f"%{g}%") for g in parsed_intent['genres']]))
+        hits = query_base.filter(or_(*[Song.genre.ilike(f"%{g}%") for g in parsed_intent['genres']])).limit(100).all()
+        candidate_ids.update(s.id for s in hits)
         
-    # Metadata Safety Fallback: Search keywords in title/artist if they (or their parts) don't have vector dimensions
+    # Metadata Safety Fallback
     for kw in search_keywords:
         kw_lower = kw.lower().strip()
-        # Check if this keyword or any of its words were matched in the vector dictionary
         was_expanded = any(word in matched_atomized for word in kw_lower.split())
-        
         if not was_expanded:
-            query = query.filter(or_(
-                Song.title.ilike(f"%{kw}%"),
-                Song.artist.ilike(f"%{kw}%")
-            ))
+            hits = query_base.filter(or_(Song.title.ilike(f"%{kw}%"), Song.artist.ilike(f"%{kw}%"))).limit(50).all()
+            candidate_ids.update(s.id for s in hits)
 
-    # 3. High-Dimensional Scoring
-    candidates = query.limit(250).all()
+    # Pool C: Random Discovery Samples (Crucial for Vibe Discovery)
+    # This allows the similarity engine to find "Rock Vibes" even in songs not tagged "Rock"
+    random_samples = query_base.order_by(db.func.random()).limit(75).all()
+    candidate_ids.update(s.id for s in random_samples)
+
+    # 4. Final Candidate Fetch
+    candidates = Song.query.filter(Song.id.in_(list(candidate_ids))).all()
+
+    # 5. High-Dimensional Scoring
     all_songs = []
     
+    # User Profile (Fetch once)
+    profile = _get_user_profile(user_id) if user_id else {"top_tags": [], "fav_genre": None}
+    personal_trending_ids = {}
+    if user_id:
+        pt = PersonalTrending.query.filter_by(user_id=user_id).all()
+        personal_trending_ids = {item.song_id: item.engagement_count for item in pt}
+
     for s in candidates:
         s_dict = s.to_dict()
-        # Find analysis
         analysis = SongAnalysis.query.filter_by(song_id=s.id).first()
         
-        # Calculate Similarity across all expanded dimensions
         sim_score, sim_details = DiscoveryEngine.calculate_similarity(analysis, target_vector)
         s_dict['sim_score'] = sim_score
         s_dict['sim_reasoning'] = sim_details
@@ -670,8 +688,12 @@ def search_intent():
         base_relevance = 0
         sid = s.id
         
+        # Soft Genre Match Boost
+        if parsed_intent.get('genres'):
+            if any(g.lower() in s.genre.lower() for g in parsed_intent['genres']):
+                base_relevance += 20  # Significant boost but not a requirement
+        
         if user_id:
-            profile = _get_user_profile(user_id)
             # Favorite Genre Boost
             if s.genre == profile['fav_genre']:
                 base_relevance += 15
@@ -691,16 +713,28 @@ def search_intent():
     # 4. Sort and finalize
     all_songs.sort(key=lambda x: x['ranking_score'], reverse=True)
     
-    # 5. External Discovery (Last.fm Fallback)
+    # 5. External Discovery (Tag-Based Fallback)
     ext_query = parsed_intent.get('external_search_query')
     has_target_artist = False
     if parsed_intent.get('artist'):
         has_target_artist = any(parsed_intent['artist'].lower() in s['artist'].lower() for s in all_songs[:8])
         
-    if (len(all_songs) < 5 or not has_target_artist) and ext_query and LASTFM_API_KEY:
+    if (len(all_songs) < 8 or not has_target_artist) and ext_query and LASTFM_API_KEY:
         try:
             client = LastFMClient(LASTFM_API_KEY)
-            external_results = client.search_track(ext_query, limit=10)
+            
+            # PHASE 21 Optimization: If searching for a vibe/genre, use Tag Discovery
+            # We check if the query matches our FeatureDictionary atomized matches
+            is_vibe_query = any(word in matched_atomized for word in ext_query.lower().split())
+            
+            if is_vibe_query:
+                # Use Tag Lookup for better diversity (e.g. AC/DC instead of "Rock" the song)
+                vibe_tag = matched_atomized[0] if matched_atomized else ext_query
+                external_results = client.get_top_tracks_by_tag(vibe_tag, limit=12)
+                reasoning_msg = f"Top-rated tracks discovery via '{vibe_tag}' vibe."
+            else:
+                external_results = client.search_track(ext_query, limit=10)
+                reasoning_msg = "Found via external discovery engine."
             
             existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in all_songs)
             for res in external_results:
@@ -713,9 +747,9 @@ def search_intent():
                         "genre": "External Discovery",
                         "bpm": "Unknown",
                         "decibel_peak": "Unknown",
-                        "sim_score": 0.5, # Mid-similarity for external
-                        "sim_reasoning": "Found via external discovery engine.",
-                        "ranking_score": 50 # Base score for external matches
+                        "sim_score": 0.6,
+                        "sim_reasoning": reasoning_msg,
+                        "ranking_score": 60 
                     })
                     existing_keys.add(key)
         except Exception as e:
