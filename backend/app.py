@@ -18,7 +18,7 @@ load_dotenv() # Load variables from .env
 
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
-app.secret_key = os.getenv('SECRET_KEY', 'undertone-secret-key-poc') 
+# app.secret_key = os.getenv('SECRET_KEY', 'undertone-secret-key-poc') 
 CORS(app, supports_credentials=True)
 
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
