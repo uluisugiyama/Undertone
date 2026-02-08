@@ -1,6 +1,6 @@
 <div align="center">
   <br />
-  <h1>🌊 U N D E R T O N E</h1>
+  <h1> U N D E R T O N E</h1>
   <h3>Intent-Driven Music Discovery Engine</h3>
   
   <p>
@@ -154,7 +154,6 @@ Phase 10 integration uses `librosa` to handle complex queries:
 ```bash
 python backend/app.py
 ```
-Access the API at `http://127.0.0.1:5001`.
 
 ---
 
@@ -168,13 +167,8 @@ Access the API at `http://127.0.0.1:5001`.
 - [x] **Phase 6: Feedback**: Search success collection.
 - [x] **Phase 7: CF Engine**: Shared taste logic.
 - [x] **Phase 8: Toggles**: Mainstream vs Niche modes.
-- [ ] **Phase 9: UI Overhaul**: Navy Blue premium design.
-- [ ] **Phase 10: Audio**: Librosa integration.
-- [ ] **Phase 11: Loops**: Algorithm refinement cron jobs.
-- [ ] **Phase 12: Polish**: Optimization & kontradiction flagging.
+- [x] **Phase 9: UI Overhaul**: Navy Blue premium design.
+- [x] **Phase 10: Audio**: Librosa integration.
+- [x] **Phase 11: Loops**: Algorithm refinement cron jobs.
+- [x] **Phase 12: Polish**: Optimization & contradiction flagging.
 
----
-
-<div align="center">
-  <p><b>Undertone</b> is open-source software licensed under the <a href="./LICENSE">MIT License</a>.</p>
-</div>
