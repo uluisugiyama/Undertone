@@ -3,7 +3,7 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_
-from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag
+from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag, SearchLog
 from music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
 import random
@@ -11,13 +11,19 @@ import math
 from datetime import datetime
 import google.generativeai as genai
 import json
+from dotenv import load_dotenv
+from lastfm_client import LastFMClient
+
+load_dotenv() # Load variables from .env
+
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.secret_key = 'undertone-secret-key-poc' # Change this in production
 CORS(app, supports_credentials=True)
 
-LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
-GEMINI_API_KEY = "AIzaSyAUJznMEn6DSqXPjOwS3YDTuXeg5XmuyJM."
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -163,12 +169,20 @@ def save_to_library():
     
     data = request.json
     song_id = data.get('song_id')
+    search_log_id = data.get('search_log_id')
     
     if UserLibrary.query.filter_by(user_id=session['user_id'], song_id=song_id).first():
         return jsonify({"message": "Song already in library"}), 200
     
     entry = UserLibrary(user_id=session['user_id'], song_id=song_id)
     db.session.add(entry)
+
+    # Phase 6: Search Success Logic
+    if search_log_id:
+        log = SearchLog.query.get(search_log_id)
+        if log:
+            log.selected_song_id = song_id
+            db.session.add(log)
     
     # Track engagement for Personal Trending
     trending = PersonalTrending.query.filter_by(user_id=session['user_id'], song_id=song_id).first()
@@ -211,7 +225,32 @@ def rate_song():
         db.session.add(new_rating)
     
     db.session.commit()
-    return jsonify({"message": "Rating saved"}), 201
+
+    # Phase 7: Shared Taste - Refine tags based on user comment
+    if comment and len(comment) > 5:
+        refine_prompt = f"""
+        Analyze this user review for a song: "{comment}"
+        Identify 1-3 musical tags or moods mentioned (e.g., 'chill', 'energetic', 'dark', 'bass-heavy').
+        Return ONLY a JSON list of strings: ["tag1", "tag2"]
+        """
+        try:
+            refine_response = model.generate_content(refine_prompt)
+            clean_tags = refine_response.text.replace('```json', '').replace('```', '').strip()
+            new_tags = json.loads(clean_tags)
+            
+            for t_name in new_tags:
+                t_name = t_name.lower().strip()
+                tag = SongTag.query.filter_by(song_id=song_id, tag_name=t_name).first()
+                if tag:
+                    tag.count += 1
+                else:
+                    tag = SongTag(song_id=song_id, tag_name=t_name, count=1)
+                    db.session.add(tag)
+            db.session.commit()
+        except Exception as e:
+            print(f"Tag refinement error: {e}")
+
+    return jsonify({"message": "Rating saved and metadata refined"}), 201
 
 @app.route('/search/intent')
 def search_intent():
@@ -230,6 +269,7 @@ def search_intent():
     - year_end (int or null)
     - tempo (string: 'slow', 'medium', 'fast' or null)
     - keywords (list of strings for search)
+    - external_search_query (A string optimized for searching Last.fm if the local DB might not have this, otherwise null)
     Return ONLY JSON.
     """
     
@@ -241,10 +281,26 @@ def search_intent():
     except Exception as e:
         print(f"Gemini error: {e}")
         # Fallback to empty intent if Gemini fails
-        parsed_intent = {"artist": None, "genres": [], "mood": None, "year_start": None, "year_end": None, "tempo": None, "keywords": []}
+        parsed_intent = {"artist": None, "genres": [], "mood": None, "year_start": None, "year_end": None, "tempo": None, "keywords": [], "external_search_query": None}
 
-    query = Song.query
+    # Phase 6: Log Intent
+    new_log = SearchLog(
+        user_id=session.get('user_id'),
+        intent=intent,
+        mode=request.args.get('mode', 'all')
+    )
+    db.session.add(new_log)
+    db.session.commit()
     
+    query = Song.query # Initialize query before applying filters
+
+    # Apply Mode Filter (Mainstream vs Niche)
+    mode = request.args.get('mode', 'all')
+    if mode == 'mainstream':
+        query = query.filter(Song.mainstream_score >= 70)
+    elif mode == 'niche':
+        query = query.filter(Song.mainstream_score < 70)
+
     # Apply Filters from parsed intent
     if parsed_intent.get('artist'):
         query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
@@ -256,8 +312,10 @@ def search_intent():
 
     if parsed_intent.get('tempo') == 'slow':
         query = query.filter(Song.bpm < 100)
+    elif parsed_intent.get('tempo') == 'medium':
+        query = query.filter(Song.bpm >= 100, Song.bpm <= 125)
     elif parsed_intent.get('tempo') == 'fast':
-        query = query.filter(Song.bpm >= 125)
+        query = query.filter(Song.bpm > 125)
 
     # Keywords (Artist, Title, Genre, Tags)
     keywords = parsed_intent.get('keywords', [])
@@ -270,27 +328,34 @@ def search_intent():
         ))
 
     songs = query.limit(50).all()
+    all_songs = [song.to_dict() for song in songs]
     
-    # 2. Recommendation Logic for Highly Unique Queries (Scarce Results)
-    if len(songs) < 3:
-        # If results are scarce, use Gemini to recommend general related songs
-        rec_prompt = f"""
-        The user searched for: "{intent}". 
-        We found very few matches. Recommend 5 general songs (Artist - Title) that are related to this intent.
-        Return ONLY a list of strings in valid JSON format: ["Artist - Title", ...]
-        """
-        try:
-            rec_response = model.generate_content(rec_prompt)
-            clean_rec = rec_response.text.replace('```json', '').replace('```', '').strip()
-            rec_titles = json.loads(clean_rec)
-            
-            # Surface these titles in the response (or markers for frontend to import)
-            ai_recs = [{"artist": r.split(" - ")[0], "title": r.split(" - ")[1], "ai_recommendation": True} for r in rec_titles if " - " in r]
-            return jsonify([song.to_dict() for song in songs] + ai_recs)
-        except:
-            pass
+    # 2. Collaborative API Logic: If results are low, search Last.fm using Gemini's query
+    ext_query = parsed_intent.get('external_search_query')
+    if (len(all_songs) < 5 or "drake" in intent.lower()) and ext_query:
+        client = LastFMClient(LASTFM_API_KEY)
+        external_results = client.search_track(ext_query, limit=10)
+        
+        # Merge external results that aren't already in all_songs
+        existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in all_songs)
+        
+        for res in external_results:
+            key = f"{res['artist'].lower()}|{res['title'].lower()}"
+            if key not in existing_keys:
+                all_songs.append({
+                    "artist": res['artist'],
+                    "title": res['title'],
+                    "ai_recommendation": True, # Treat as AI/External rec for UI
+                    "genre": "External Discovery",
+                    "bpm": "Unknown",
+                    "decibel_peak": "Unknown"
+                })
+                existing_keys.add(key)
 
-    return jsonify([song.to_dict() for song in songs])
+    return jsonify({
+        "songs": all_songs,
+        "search_log_id": new_log.id
+    })
 
 @app.route('/songs/explore')
 def explore_songs():

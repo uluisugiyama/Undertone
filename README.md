@@ -162,12 +162,12 @@ Access the API at `http://127.0.0.1:5001`.
 
 - [x] **Phase 1: Skeleton**: Flask setup & Song Schema.
 - [/] **Phase 2: Logic**: Music standards & Genre taxonomy.
-- [ ] **Phase 3: Data**: Ingestion & Objective filtering.
-- [ ] **Phase 4: Frontend**: POC UI.
-- [ ] **Phase 5: Profiles**: User Authentication & Libraries.
-- [ ] **Phase 6: Feedback**: Search success collection.
-- [ ] **Phase 7: CF Engine**: Shared taste logic.
-- [ ] **Phase 8: Toggles**: Mainstream vs Niche modes.
+- [x] **Phase 3: Data**: Ingestion & Objective filtering.
+- [x] **Phase 4: Frontend**: POC UI.
+- [x] **Phase 5: Profiles**: User Authentication & Libraries.
+- [x] **Phase 6: Feedback**: Search success collection.
+- [x] **Phase 7: CF Engine**: Shared taste logic.
+- [x] **Phase 8: Toggles**: Mainstream vs Niche modes.
 - [ ] **Phase 9: UI Overhaul**: Navy Blue premium design.
 - [ ] **Phase 10: Audio**: Librosa integration.
 - [ ] **Phase 11: Loops**: Algorithm refinement cron jobs.

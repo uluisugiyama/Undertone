@@ -1,11 +1,13 @@
+import os
+from dotenv import load_dotenv
 from app import app, db
 from models import Song, SongTag
 from lastfm_client import LastFMClient
 import time
 import math
 
-# Use the provided API Key
-LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
+load_dotenv()
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 def calculate_mainstream_score(listeners):
     if listeners <= 0:

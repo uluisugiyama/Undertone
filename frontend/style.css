@@ -284,6 +284,35 @@ button:active {
     border: 1px solid var(--glass-border);
 }
 
+.mode-selector {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.mode-chip {
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.mode-chip:hover {
+    border-color: var(--glass-border-bright);
+    color: var(--text-main);
+}
+
+.mode-chip.active {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+}
+
 .popularity-badge {
     position: absolute;
     top: 1rem;

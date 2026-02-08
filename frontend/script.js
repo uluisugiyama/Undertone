@@ -1,5 +1,5 @@
 // Helper to render song cards
-function renderSongCards(songs, containerId) {
+function renderSongCards(songs, containerId, searchLogId = null) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
@@ -10,7 +10,7 @@ function renderSongCards(songs, containerId) {
         // Handle AI Recommendations vs DB results
         const isAI = song.ai_recommendation;
         const btnText = isAI ? 'Import to Undertone' : 'Save to Collection';
-        const btnAction = isAI ? `importExternal('${song.artist}', '${song.title}')` : `saveToLibrary(${song.id})`;
+        const btnAction = isAI ? `importExternal('${song.artist.replace(/'/g, "\\'")}', '${song.title.replace(/'/g, "\\'")}')` : `saveToLibrary(${song.id}, ${searchLogId})`;
         const metaLine = isAI ? 'AI RECOMMENDATION' : `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
         const tagHtml = isAI ? '<p style="font-size: 0.8rem; color: var(--text-muted);">This song matches your unique intent. Import it to see full metadata.</p>' : (song.tags ? song.tags.map(t => `<span class="tag">${t.tag_name}</span>`).join('') : '');
 
@@ -52,6 +52,16 @@ async function loadExploreSongs() {
     }
 }
 
+// Mode selection logic
+let currentMode = 'all';
+document.querySelectorAll('.mode-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        document.querySelectorAll('.mode-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentMode = chip.dataset.mode;
+    });
+});
+
 document.getElementById('search-btn').addEventListener('click', async () => {
     const intent = document.getElementById('intent-input').value;
 
@@ -65,29 +75,31 @@ document.getElementById('search-btn').addEventListener('click', async () => {
     resultsTitle.style.display = 'block';
 
     try {
-        const response = await fetch(`/search/intent?intent=${encodeURIComponent(intent)}`, {
+        const response = await fetch(`/search/intent?intent=${encodeURIComponent(intent)}&mode=${currentMode}`, {
             headers: { 'Content-Type': 'application/json' }
         });
-        const songs = await response.json();
+        const data = await response.json();
+        const songs = data.songs;
+        const searchLogId = data.search_log_id;
 
         if (songs.length === 0) {
-            resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center;">Your undertone is highly unique. No matches found for this specific intent.</div>';
+            resultsList.innerHTML = `<div class="glass-card" style="grid-column: 1/-1; text-align: center;">No matches found for this intent in ${currentMode} mode. Try switching discovery modes or broadening your intent.</div>`;
             return;
         }
 
-        renderSongCards(songs, 'results-list');
+        renderSongCards(songs, 'results-list', searchLogId);
     } catch (err) {
         console.error(err);
         resultsList.innerHTML = '<div class="glass-card" style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">Search failed. Analysis engine offline.</div>';
     }
 });
 
-async function saveToLibrary(songId) {
+async function saveToLibrary(songId, searchLogId = null) {
     try {
         const response = await fetch('/library/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ song_id: songId })
+            body: JSON.stringify({ song_id: songId, search_log_id: searchLogId })
         });
         const data = await response.json();
         if (response.status === 401) {

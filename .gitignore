@@ -4,3 +4,4 @@ __pycache__/
 backend/undertone.db
 backend/__pycache__/
 .DS_Store
+.env

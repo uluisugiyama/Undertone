@@ -75,3 +75,12 @@ class PersonalTrending(db.Model):
     song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=False)
     engagement_count = db.Column(db.Integer, default=1)
     last_engaged_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SearchLog(db.Model):
+    __tablename__ = 'search_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    intent = db.Column(db.String(500), nullable=False)
+    selected_song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=True)
+    mode = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

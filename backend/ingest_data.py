@@ -1,12 +1,14 @@
 import random
 import time
+import os
+from dotenv import load_dotenv
 from app import app, db
 from models import Song
 from music_standards import GENRE_TAXONOMY
 from lastfm_client import LastFMClient
 
-# Use the provided API Key
-LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
+load_dotenv()
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 def seed_real_data():
     client = LastFMClient(LASTFM_API_KEY)
