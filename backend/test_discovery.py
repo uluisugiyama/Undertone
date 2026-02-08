@@ -26,7 +26,7 @@ def run_tests():
     )
     
     intent = ["fast", "minimal"]
-    target_vector = FeatureDictionary.expand_intent(intent)
+    target_vector, _ = FeatureDictionary.expand_intent(intent)
     score, details = DiscoveryEngine.calculate_similarity(bossa_nova, target_vector)
     
     print(f"\nTEST 1: 'Fast' + 'Minimal'")
@@ -43,7 +43,7 @@ def run_tests():
     )
     
     intent = ["dark", "melodic"]
-    target_vector = FeatureDictionary.expand_intent(intent)
+    target_vector, _ = FeatureDictionary.expand_intent(intent)
     score, details = DiscoveryEngine.calculate_similarity(emo_track, target_vector)
     
     print(f"\nTEST 2: 'Dark' + 'Melodic'")
@@ -61,7 +61,7 @@ def run_tests():
     )
     
     intent = ["heavy"]
-    target_vector = FeatureDictionary.expand_intent(intent)
+    target_vector, _ = FeatureDictionary.expand_intent(intent)
     score, details = DiscoveryEngine.calculate_similarity(metal_track, target_vector)
     
     print(f"\nTEST 3: 'Heavy'")

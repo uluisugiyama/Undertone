@@ -95,6 +95,30 @@ class FeatureDictionary:
             "spatial_width": (0.7, 1.0),
             "analog_digital_feel": (0.0, 0.3),
             "section_count": (5, 12)
+        },
+        "rock": {
+            "instrument_density": (0.5, 0.9),
+            "percussive_density": (0.5, 0.9),
+            "calm_energetic": (0.5, 0.9),
+            "analog_digital_feel": (0.0, 0.6)
+        },
+        "pop": {
+            "analog_digital_feel": (0.6, 1.0),
+            "percussive_density": (0.4, 0.8),
+            "vocal_presence": (0.7, 1.0),
+            "harmonic_tension": (0.0, 0.4)
+        },
+        "jazz": {
+            "chord_complexity": (0.7, 1.0),
+            "instrument_separation": (0.6, 1.0),
+            "groove_complexity": (0.5, 1.0),
+            "tempo_stability": (0.2, 0.7)
+        },
+        "electronic": {
+            "analog_digital_feel": (0.7, 1.0),
+            "percussive_density": (0.6, 1.0),
+            "spatial_width": (0.6, 1.0),
+            "reverb_density": (0.3, 0.8)
         }
     }
 
@@ -102,16 +126,36 @@ class FeatureDictionary:
     def expand_intent(cls, keywords):
         """
         Decomposes keywords into a unified target vector.
+        Supports compound intents by atomizing multi-word phrases.
+        Returns (target_vector, matched_keywords)
         """
         target_vector = {}
+        matched_keywords = []
+        
+        # Atomize: Split "sad rock" into ["sad", "rock"] if the full phrase doesn't exist
         for kw in keywords:
-            kw = kw.lower()
+            kw = kw.lower().strip()
+            if kw in cls.DICTIONARY:
+                matched_keywords.append(kw)
+            else:
+                # If compound phrase not found, try individual words
+                words = kw.split()
+                if len(words) > 1:
+                    for word in words:
+                        if word in cls.DICTIONARY:
+                            matched_keywords.append(word)
+                else:
+                    # Keep unmapped keywords in stats but they won't have vector data
+                    pass
+
+        for kw in matched_keywords:
             if kw in cls.DICTIONARY:
                 for feature, val in cls.DICTIONARY[kw].items():
                     if feature not in target_vector:
                         target_vector[feature] = []
                     target_vector[feature].append(val)
-        return target_vector
+                    
+        return target_vector, matched_keywords
 
 class DiscoveryEngine:
     """

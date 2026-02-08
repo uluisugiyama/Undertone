@@ -622,7 +622,7 @@ def search_intent():
     if parsed_intent.get('mood'):
         search_keywords.append(parsed_intent['mood'])
     
-    target_vector = FeatureDictionary.expand_intent(search_keywords)
+    target_vector, matched_atomized = FeatureDictionary.expand_intent(search_keywords)
     
     # 3. Broad Candidate Selection
     query = Song.query.outerjoin(SongAnalysis)
@@ -640,9 +640,13 @@ def search_intent():
     if parsed_intent.get('genres'):
         query = query.filter(or_(*[Song.genre.ilike(f"%{g}%") for g in parsed_intent['genres']]))
         
-    # Metadata Safety Fallback: Search keywords in title/artist if they don't have vector dimensions
+    # Metadata Safety Fallback: Search keywords in title/artist if they (or their parts) don't have vector dimensions
     for kw in search_keywords:
-        if kw.lower() not in target_vector:
+        kw_lower = kw.lower().strip()
+        # Check if this keyword or any of its words were matched in the vector dictionary
+        was_expanded = any(word in matched_atomized for word in kw_lower.split())
+        
+        if not was_expanded:
             query = query.filter(or_(
                 Song.title.ilike(f"%{kw}%"),
                 Song.artist.ilike(f"%{kw}%")
@@ -725,7 +729,7 @@ def search_intent():
         "search_log_id": new_log.id,
         "parsed_intent": parsed_intent,
         "expansion_stats": {
-            "keywords_expanded": search_keywords,
+            "keywords_expanded": matched_atomized,
             "dimensions_checked": list(target_vector.keys())
         }
     })
