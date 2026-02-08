@@ -1,9 +1,11 @@
 import random
 import time
-from app import app, db
-from models import Song
-from music_standards import GENRE_TAXONOMY, get_parent_genre
-from lastfm_client import LastFMClient
+import os
+from dotenv import load_dotenv
+from backend.app import app, db
+from backend.models import Song, SongTag
+from backend.music_standards import GENRE_TAXONOMY, get_parent_genre
+from backend.lastfm_client import LastFMClient
 
 LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
 

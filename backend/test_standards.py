@@ -1,4 +1,5 @@
-from music_standards import is_fast_tempo, is_heavy, get_parent_genre
+import pytest
+from backend.music_standards import is_fast_tempo, is_heavy, get_parent_genre
 
 def test_standards():
     print("Testing Music Standards...")

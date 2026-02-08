@@ -1,6 +1,6 @@
-from app import app, db, calculate_mainstream_score
-from models import Song, SongTag
-from lastfm_client import LastFMClient
+from backend.app import app, db, calculate_mainstream_score
+from backend.models import Song, SongTag
+from backend.lastfm_client import LastFMClient
 import time
 import random
 

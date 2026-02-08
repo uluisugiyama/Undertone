@@ -1,9 +1,10 @@
-import os
-from dotenv import load_dotenv
-from app import app, db
-from models import Song, SongTag
-from lastfm_client import LastFMClient
 import time
+import os
+import random
+from dotenv import load_dotenv
+from backend.app import app, db
+from backend.models import Song, SongTag
+from backend.lastfm_client import LastFMClient
 import math
 
 load_dotenv()

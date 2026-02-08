@@ -2,10 +2,10 @@ import random
 import time
 import os
 from dotenv import load_dotenv
-from app import app, db
-from models import Song
-from music_standards import GENRE_TAXONOMY
-from lastfm_client import LastFMClient
+from backend.app import app, db
+from backend.models import Song
+from backend.music_standards import GENRE_TAXONOMY
+from backend.lastfm_client import LastFMClient
 
 load_dotenv()
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")

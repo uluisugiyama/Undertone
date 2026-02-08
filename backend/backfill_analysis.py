@@ -1,5 +1,6 @@
+import logging
 import time
-from app import app, db, Song, SongAnalysis, enrich_song_analysis
+from backend.app import app, db, Song, SongAnalysis, enrich_song_analysis
 
 def backfill():
     with app.app_context():

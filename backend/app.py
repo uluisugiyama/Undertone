@@ -3,8 +3,8 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, and_
-from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag, SearchLog, SongAnalysis
-from music_standards import is_fast_tempo, is_heavy, get_parent_genre
+from backend.models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag, SearchLog, SongAnalysis
+from backend.music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
 import random
 import math
@@ -12,7 +12,7 @@ import requests
 from datetime import datetime
 import json
 from dotenv import load_dotenv
-from lastfm_client import LastFMClient
+from backend.lastfm_client import LastFMClient
 
 load_dotenv() # Load variables from .env
 
