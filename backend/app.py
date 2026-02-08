@@ -142,36 +142,108 @@ def rate_song():
 @app.route('/search/objective')
 def search_objective():
     # Get query parameters
-    genre_query = request.args.get('genre')
-    tempo_query = request.args.get('tempo') # 'fast', 'slow', or 'any'
-    loudness_query = request.args.get('loudness') # 'heavy', 'mellow', or 'any'
+    genre = request.args.get('genre')
+    tempo = request.args.get('tempo') # 'fast', 'slow', or 'any'
+    loudness = request.args.get('loudness') # 'heavy', 'mellow', or 'any'
+    bpm_min = request.args.get('bpm_min', type=int)
+    bpm_max = request.args.get('bpm_max', type=int)
+    year_min = request.args.get('year_min', type=int)
+    year_max = request.args.get('year_max', type=int)
+    popularity = request.args.get('popularity', 'all') # 'all', 'mainstream', 'niche'
 
     query = Song.query
 
-    if genre_query:
-        query = query.filter((Song.genre == genre_query))
+    if genre:
+        query = query.filter(Song.genre == genre)
+    if bpm_min:
+        query = query.filter(Song.bpm >= bpm_min)
+    if bpm_max:
+        query = query.filter(Song.bpm <= bpm_max)
+    if year_min:
+        query = query.filter(Song.year >= year_min)
+    if year_max:
+        query = query.filter(Song.year <= year_max)
+    
+    # Popularity Filtering
+    if popularity == 'mainstream':
+        query = query.filter(Song.mainstream_score >= 70)
+    elif popularity == 'niche':
+        query = query.filter(Song.mainstream_score < 40)
 
-    results = query.all()
+    songs = query.all()
 
     # Apply manual filters for tempo and loudness based on music_standards
     filtered_results = []
-    for song in results:
+    for song in songs:
         match_tempo = True
-        if tempo_query == 'fast':
+        if tempo == 'fast':
             match_tempo = is_fast_tempo(song.bpm)
-        elif tempo_query == 'slow':
+        elif tempo == 'slow':
             match_tempo = not is_fast_tempo(song.bpm)
 
         match_loudness = True
-        if loudness_query == 'heavy':
+        if loudness == 'heavy':
             match_loudness = is_heavy(song.decibel_peak)
-        elif loudness_query == 'mellow':
+        elif loudness == 'mellow':
             match_loudness = not is_heavy(song.decibel_peak)
 
         if match_tempo and match_loudness:
             filtered_results.append(song.to_dict())
 
     return jsonify(filtered_results)
+
+@app.route('/recommendations')
+def get_recommendations():
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session['user_id']
+    
+    # 1. Fetch songs the user has rated highly (4 or 5 stars)
+    high_ratings = UserRating.query.filter(UserRating.user_id == user_id, UserRating.rating >= 4).all()
+    if not high_ratings:
+        return jsonify([]) # No data to base recommendations on
+    
+    liked_song_ids = [r.song_id for r in high_ratings]
+    
+    # 2. Identify frequent tags and GENRES among highly rated songs
+    tag_counts = {}
+    genre_counts = {}
+    for song_id in liked_song_ids:
+        song = Song.query.get(song_id)
+        genre_counts[song.genre] = genre_counts.get(song.genre, 0) + 1
+        for t in song.tags:
+            tag_counts[t.tag_name] = tag_counts.get(t.tag_name, 0) + 1
+            
+    # Get top 5 tags and top 1 genre
+    sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_tag_names = [t[0] for t in sorted_tags]
+    
+    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
+    fav_genre = sorted_genres[0][0] if sorted_genres else None
+    
+    # 3. Find other songs that share tags OR the favorite genre
+    user_library_ids = [entry.song_id for entry in UserLibrary.query.filter_by(user_id=user_id).all()]
+    potential_matches = Song.query.filter(Song.id.notin_(user_library_ids)).all()
+    
+    recs = []
+    for song in potential_matches:
+        song_tags = [t.tag_name for t in song.tags]
+        tag_overlap = set(top_tag_names).intersection(set(song_tags))
+        
+        score = len(tag_overlap)
+        if song.genre == fav_genre:
+            score += 2 # Genre match counts for a lot!
+            
+        if score > 0:
+            song_dict = song.to_dict()
+            song_dict['match_score'] = score
+            recs.append(song_dict)
+            
+    # Sort by score and mainstream score
+    recs = sorted(recs, key=lambda x: (x['match_score'], x['mainstream_score']), reverse=True)
+    
+    return jsonify(recs[:10])
 
 if __name__ == '__main__':
     with app.app_context():

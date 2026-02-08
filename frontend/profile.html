@@ -5,65 +5,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Profile & Library</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 0 20px;
-        }
-
-        .nav {
-            margin-bottom: 20px;
-        }
-
-        .song-card {
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-        }
-
-        .rating-box {
-            margin-top: 10px;
-            background: #f9f9f9;
-            padding: 10px;
-            border-radius: 4px;
-        }
-
-        .tag {
-            display: inline-block;
-            background: #e0e0e0;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 0.8em;
-            margin: 2px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="nav">
-        <a href="/gui">Search</a> | <strong>Profile</strong>
-    </div>
+    <div class="container">
+        <nav class="nav">
+            <div class="nav-links">
+                <a href="/gui">Discovery</a>
+                <strong style="margin-left: 1.5rem;">Profile</strong>
+            </div>
+        </nav>
 
-    <div id="auth-section">
-        <div id="login-form">
-            <h3>Login / Register</h3>
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
-            <button id="login-btn">Login</button>
-            <button id="register-btn">Register</button>
-        </div>
-        <div id="user-info" style="display: none;">
-            <h3>Welcome, <span id="display-username"></span>!</h3>
-            <button id="logout-btn">Logout</button>
-        </div>
-    </div>
+        <section id="auth-section" class="glass-card">
+            <div id="login-form">
+                <header style="text-align: center; margin-bottom: 2rem;">
+                    <h2>Join the Undertone</h2>
+                    <p style="color: var(--text-muted);">Access your library and personalized discovery.</p>
+                </header>
+                <div class="filter-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="e.g. music_lover">
+                </div>
+                <div class="filter-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="••••••••">
+                </div>
+                <button id="login-btn">Login</button>
+                <button id="register-btn"
+                    style="background: transparent; border: 1px solid var(--glass-border); margin-top: -0.5rem;">Create
+                    Account</button>
+            </div>
 
-    <div id="library-section" style="display: none;">
-        <h2>My Library</h2>
-        <div id="library-list"></div>
+            <div id="user-info" style="display: none; text-align: center;">
+                <h2>Welcome back, <span id="display-username" style="color: var(--accent-primary);"></span>!</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem;">Manage your curated collection below.</p>
+                <button id="logout-btn"
+                    style="background: var(--bg-deep); border: 1px solid #ff4d4d; color: #ff4d4d;">Logout</button>
+            </div>
+        </section>
+
+        <section id="library-section" style="display: none; margin-top: 4rem;">
+            <header style="margin-bottom: 2rem;">
+                <h2>My Personal Library</h2>
+                <p style="color: var(--text-muted);">Your saved tracks and personal ratings.</p>
+            </header>
+            <div id="library-list">
+                <!-- Saved songs will be injected here -->
+            </div>
+
+            <hr style="margin: 4rem 0; border: 0; border-top: 1px solid var(--glass-border);">
+
+            <header style="margin-bottom: 2rem;">
+                <h2>Recommended For You</h2>
+                <p style="color: var(--text-muted);">Based on your style profile and community tags.</p>
+            </header>
+            <div id="recommendations-list">
+                <!-- Recommendations will be injected here -->
+            </div>
+        </section>
     </div>
 
     <script src="/profile.js"></script>

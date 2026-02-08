@@ -2,9 +2,18 @@ from app import app, db
 from models import Song, SongTag
 from lastfm_client import LastFMClient
 import time
+import math
 
 # Use the provided API Key
 LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
+
+def calculate_mainstream_score(listeners):
+    if listeners <= 0:
+        return 0
+    # Logarithmic scale: 10M listeners -> 100, 1M -> 86, 100k -> 71, 10k -> 57, 1k -> 43, 100 -> 28, 10 -> 14
+    # formula: min(100, log10(listeners) * 14.3)
+    score = int(math.log10(listeners) * 14.3)
+    return min(100, max(0, score))
 
 def enrich_songs():
     client = LastFMClient(LASTFM_API_KEY)
@@ -17,12 +26,11 @@ def enrich_songs():
             if not song.artist or not song.title:
                 continue
             
-            print(f"Fetching tags for: {song.artist} - {song.title}")
+            print(f"Fetching data for: {song.artist} - {song.title}")
+            
+            # 1. Fetch Tags
             tags = client.get_track_tags(song.artist, song.title)
-            
-            # Clear existing tags for this song to avoid duplicates if re-running
             SongTag.query.filter_by(song_id=song.id).delete()
-            
             for t_data in tags:
                 new_tag = SongTag(
                     song_id=song.id,
@@ -30,6 +38,12 @@ def enrich_songs():
                     count=t_data['count']
                 )
                 db.session.add(new_tag)
+            
+            # 2. Fetch Popularity (Track Info)
+            info = client.get_track_info(song.artist, song.title)
+            listeners = info.get('listeners', 0)
+            song.mainstream_score = calculate_mainstream_score(listeners)
+            print(f"  Listeners: {listeners}, Calculated Score: {song.mainstream_score}")
             
             db.session.commit()
             # Brief sleep to be polite to the API

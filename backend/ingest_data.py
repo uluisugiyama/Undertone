@@ -1,87 +1,68 @@
 import random
+import time
 from app import app, db
 from models import Song
 from music_standards import GENRE_TAXONOMY
+from lastfm_client import LastFMClient
 
-# Realistic mappings for 50-song seed
-ARTIST_TRACK_POOL = {
-    "Metalcore": [
-        ("As I Lay Dying", "Confined"),
-        ("August Burns Red", "Marianas Trench"),
-        ("Killswitch Engage", "The End of Heartache"),
-        ("Bring Me The Horizon", "Shadow Moses"),
-        ("Architects", "Doomsday"),
-        ("Parkway Drive", "Carrion"),
-        ("All That Remains", "Two Weeks")
-    ],
-    "Rock": [
-        ("Arctic Monkeys", "Do I Wanna Know?"),
-        ("Foo Fighters", "Everlong"),
-        ("Nirvana", "Smells Like Teen Spirit"),
-        ("The Killers", "Mr. Brightside"),
-        ("Red Hot Chili Peppers", "Californication"),
-        ("Queens of the Stone Age", "No One Knows")
-    ],
-    "Industrial": [
-        ("Nine Inch Nails", "Closer"),
-        ("Marilyn Manson", "The Beautiful People"),
-        ("Rammstein", "Du Hast"),
-        ("Ministry", "Stigmata"),
-        ("Fear Factory", "Replica")
-    ],
-    "Jazz": [
-        ("Miles Davis", "So What"),
-        ("John Coltrane", "Giant Steps"),
-        ("Dave Brubeck", "Take Five"),
-        ("Thelonious Monk", "Round Midnight"),
-        ("Charles Mingus", "Goodbye Pork Pie Hat")
-    ],
-    "Electronic": [
-        ("Daft Punk", "One More Time"),
-        ("The Chemical Brothers", "Galvanize"),
-        ("Aphex Twin", "Windowlicker"),
-        ("Justice", "D.A.N.C.E."),
-        ("Deadmau5", "Strobe")
-    ],
-    "Classical": [
-        ("Ludwig van Beethoven", "Symphony No. 5"),
-        ("Wolfgang Amadeus Mozart", "Lacrimosa"),
-        ("Johann Sebastian Bach", "Toccata and Fugue in D Minor"),
-        ("Frédéric Chopin", "Nocturne op.9 No.2")
-    ]
-}
+# Use the provided API Key
+LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
 
-def seed_data():
+def seed_real_data():
+    client = LastFMClient(LASTFM_API_KEY)
+    
     with app.app_context():
-        # Clear existing songs
+        print("Clearing existing songs...")
         Song.query.delete()
+        db.session.commit()
         
         genres = list(GENRE_TAXONOMY.keys())
+        total_songs = 0
+        target_total = 100
+        songs_per_genre = 10
         
-        for i in range(50):
-            genre = random.choice(genres)
-            parent = GENRE_TAXONOMY[genre]
+        print(f"Starting real data ingestion for {len(genres)} genres...")
+        
+        for genre in genres:
+            if total_songs >= target_total:
+                break
+                
+            print(f"Fetching top tracks for genre: {genre}")
+            tracks = client.get_top_tracks_by_tag(genre, limit=songs_per_genre)
             
-            # Pick a realistic artist/track if available, otherwise generic
-            pool = ARTIST_TRACK_POOL.get(genre) or ARTIST_TRACK_POOL.get(parent)
-            if pool:
-                artist, title = random.choice(pool)
-            else:
-                artist, title = f"Artist {i}", f"Song Title {i}"
+            if not tracks:
+                # Try parent genre if subgenre returns nothing
+                parent = GENRE_TAXONOMY[genre]
+                if parent:
+                    print(f"  No tracks for {genre}, trying parent: {parent}")
+                    tracks = client.get_top_tracks_by_tag(parent, limit=songs_per_genre)
+            
+            for t_data in tracks:
+                # Check if song already exists to avoid duplicates
+                existing = Song.query.filter_by(artist=t_data['artist'], title=t_data['title']).first()
+                if existing:
+                    continue
+                
+                # Create song with real metadata and randomized objective traits
+                # (Traits will be refined in Phase 10)
+                song = Song(
+                    artist=t_data['artist'],
+                    title=t_data['title'],
+                    genre=genre,
+                    bpm=random.randint(60, 180),
+                    decibel_peak=round(random.uniform(-25.0, -5.0), 1),
+                    year=random.randint(1990, 2024),
+                    mainstream_score=0 # Will be updated by enrich_data.py
+                )
+                db.session.add(song)
+                total_songs += 1
+            
+            db.session.commit()
+            print(f"  Added {len(tracks)} tracks for {genre}. Total: {total_songs}")
+            # Be polite to API
+            time.sleep(0.5)
 
-            song = Song(
-                artist=artist,
-                title=title,
-                genre=genre,
-                bpm=random.randint(60, 200),
-                decibel_peak=round(random.uniform(-30.0, -2.0), 1),
-                year=random.randint(1970, 2024),
-                mainstream_score=random.randint(0, 100)
-            )
-            db.session.add(song)
-        
-        db.session.commit()
-        print("Successfully seeded 50 songs with artist/title info.")
+        print(f"Successfully ingested {total_songs} real songs from Last.fm.")
 
 if __name__ == "__main__":
-    seed_data()
+    seed_real_data()
