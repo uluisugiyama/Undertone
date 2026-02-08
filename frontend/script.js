@@ -9,10 +9,9 @@ function renderSongCards(songs, containerId, searchLogId = null) {
 
         // Handle AI Recommendations vs DB results
         const isAI = song.ai_recommendation;
-        const btnText = isAI ? 'Import to Undertone' : 'Save to Collection';
-        const btnAction = isAI ? `importExternal('${song.artist.replace(/'/g, "\\'")}', '${song.title.replace(/'/g, "\\'")}')` : `saveToLibrary(${song.id}, ${searchLogId})`;
-        const metaLine = isAI ? 'AI RECOMMENDATION' : `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
-        const tagHtml = isAI ? '<p style="font-size: 0.8rem; color: var(--text-muted);">This song matches your unique intent. Import it to see full metadata.</p>' : (song.tags ? song.tags.map(t => `<span class="tag">${t.tag_name}</span>`).join('') : '');
+        const btnAction = `saveToLibrary(${song.id || 'null'}, ${searchLogId}, '${song.artist.replace(/'/g, "\\'")}', '${song.title.replace(/'/g, "\\'")}')`;
+        const metaLine = `${song.genre} • ${song.bpm} BPM • ${song.decibel_peak} dB`;
+        const tagHtml = (song.tags && song.tags.length > 0) ? song.tags.map(t => `<span class="tag">${t}</span>`).join('') : '<span class="tag" style="opacity: 0.5;">Unidentified</span>';
 
         card.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -25,10 +24,10 @@ function renderSongCards(songs, containerId, searchLogId = null) {
                 </span>
             </div>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.8rem 0;">${metaLine}</p>
-            <div class="tag-container">
+            <div class="tags">
                 ${tagHtml}
             </div>
-            <button onclick="${btnAction}" class="action-btn" style="margin-top: 1.5rem; width: 100%;">${btnText}</button>
+            <button onclick="${btnAction}" class="action-btn" style="margin-top: 1.5rem; width: 100%;">Save to Collection</button>
         `;
         container.appendChild(card);
     });
@@ -94,22 +93,31 @@ document.getElementById('search-btn').addEventListener('click', async () => {
     }
 });
 
-async function saveToLibrary(songId, searchLogId = null) {
+async function saveToLibrary(songId, searchLogId = null, artist = null, title = null) {
     try {
+        const payload = { song_id: songId, search_log_id: searchLogId };
+        if (!songId && artist && title) {
+            payload.artist = artist;
+            payload.title = title;
+        }
+
         const response = await fetch('/library/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ song_id: songId, search_log_id: searchLogId })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
         if (response.status === 401) {
             alert('Please login to save songs!');
             window.location.href = '/gui/profile';
+        } else if (response.status === 201 || response.status === 200) {
+            alert(`"${title || 'Song'}" saved to your collection!`);
         } else {
-            alert(data.message);
+            alert('Error: ' + (data.error || 'Unknown error'));
         }
     } catch (err) {
         console.error(err);
+        alert('Save failed.');
     }
 }
 
@@ -142,9 +150,9 @@ if (externalSearchBtn) {
                 card.innerHTML = `
                     <h5 style="color: var(--accent-primary); margin-bottom: 0.2rem;">${track.title}</h5>
                     <p style="font-size: 0.8rem; margin-bottom: 0.8rem;">${track.artist}</p>
-                    <button class="import-btn" onclick="importTrack('${track.artist.replace(/'/g, "\\'")}', '${track.title.replace(/'/g, "\\'")}')" 
-                            style="padding: 0.5rem; font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--accent-primary); color: var(--accent-primary);">
-                        Import to Undertone
+                    <button class="action-btn" onclick="saveToLibrary(null, null, '${track.artist.replace(/'/g, "\\'")}', '${track.title.replace(/'/g, "\\'")}')" 
+                            style="padding: 0.5rem; font-size: 0.8rem; width: 100%;">
+                        Save to Collection
                     </button>
                 `;
                 externalResults.appendChild(card);
@@ -156,28 +164,7 @@ if (externalSearchBtn) {
     });
 }
 
-async function importExternal(artist, title) {
-    await importTrack(artist, title);
-}
-
-async function importTrack(artist, title) {
-    try {
-        const response = await fetch('/song/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ artist, title })
-        });
-        const song = await response.json();
-        if (response.status === 201 || response.status === 200) {
-            alert(`"${song.title}" imported successfully!`);
-        } else {
-            alert('Import failed: ' + (song.error || 'Unknown error'));
-        }
-    } catch (err) {
-        console.error(err);
-        alert('Import failed.');
-    }
-}
+// Unified logic now handles imports inside saveToLibrary
 
 // Check auth status on load
 async function checkAuth() {

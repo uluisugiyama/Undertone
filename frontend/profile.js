@@ -119,10 +119,13 @@ async function loadLibrary() {
 
             <div class="rating-box">
                 <label style="font-size: 0.7rem;">MY REVIEW</label>
-                <div class="rating-stars" id="stars-${song.id}">
-                    ${[1, 2, 3, 4, 5].map(i => `<span class="star" onclick="rateSong(${song.id}, ${i})">★</span>`).join('')}
+                <div class="rating-stars" id="stars-${song.id}" data-value="${song.user_rating || 0}">
+                    ${[1, 2, 3, 4, 5].map(i => `
+                        <span class="star ${(song.user_rating >= i) ? 'active' : ''}" 
+                              onclick="rateSong(${song.id}, ${i})">★</span>
+                    `).join('')}
                 </div>
-                <textarea id="comment-${song.id}" placeholder="How does this track resonate?"></textarea>
+                <textarea id="comment-${song.id}" placeholder="How does this track resonate?">${song.user_comment || ''}</textarea>
                 <button onclick="saveRating(${song.id})" style="margin-top: 1rem; background: var(--bg-input); border: 1px solid var(--glass-border-bright); font-size: 0.75rem; padding: 0.5rem; border-radius: 8px;">
                     Update Review
                 </button>
@@ -189,7 +192,7 @@ async function loadRecommendations() {
             </div>
             
             <button onclick="saveFromRec(${song.id})" style="margin-top: 1.5rem; padding: 0.6rem; font-size: 0.8rem; background: transparent; border: 1px solid var(--accent-primary); color: var(--accent-primary); border-radius: 8px;">
-                Add to Library
+                Save to Collection
             </button>
         `;
         list.appendChild(card);
