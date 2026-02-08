@@ -26,7 +26,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 def calculate_mainstream_score(listeners):
     if listeners <= 0:
@@ -262,14 +262,14 @@ def search_intent():
     prompt = f"""
     Analyze the following music search intent: "{intent}"
     Return a JSON object with:
-    - artist (string or null)
-    - genres (list of strings)
-    - mood (string or null)
+    - artist (string or null) -> Extract the primary artist if mentioned (e.g. "Drake", "Taylor Swift").
+    - genres (list of strings: e.g. ["rock", "pop"])
+    - mood (string: e.g. "sad", "energetic", "chill" or null)
     - year_start (int or null)
     - year_end (int or null)
     - tempo (string: 'slow', 'medium', 'fast' or null)
-    - keywords (list of strings for search)
-    - external_search_query (A string optimized for searching Last.fm if the local DB might not have this, otherwise null)
+    - keywords (list of strings for search, including instruments or vibes)
+    - external_search_query (MANDATORY: A string optimized for searching Last.fm, e.g. "Drake sad songs" or "lofi beats")
     Return ONLY JSON.
     """
     
@@ -278,10 +278,11 @@ def search_intent():
         # Clean potential markdown from response
         clean_response = response.text.replace('```json', '').replace('```', '').strip()
         parsed_intent = json.loads(clean_response)
+        print(f"DEBUG PARSED INTENT: {parsed_intent}")
     except Exception as e:
         print(f"Gemini error: {e}")
         # Fallback to empty intent if Gemini fails
-        parsed_intent = {"artist": None, "genres": [], "mood": None, "year_start": None, "year_end": None, "tempo": None, "keywords": [], "external_search_query": None}
+        parsed_intent = {"artist": None, "genres": [], "mood": None, "year_start": None, "year_end": None, "tempo": None, "keywords": [], "external_search_query": intent}
 
     # Phase 6: Log Intent
     new_log = SearchLog(
@@ -317,9 +318,18 @@ def search_intent():
     elif parsed_intent.get('tempo') == 'fast':
         query = query.filter(Song.bpm > 125)
 
-    # Keywords (Artist, Title, Genre, Tags)
+    # Genre Filter
+    genres = parsed_intent.get('genres', [])
+    if genres:
+        genre_filters = [Song.genre.ilike(f"%{g}%") for g in genres]
+        query = query.filter(or_(*genre_filters))
+
+    # Mood/Keyword Filter (Artist, Title, Genre, Tags)
+    mood = parsed_intent.get('mood')
     keywords = parsed_intent.get('keywords', [])
-    for kw in keywords:
+    search_terms = keywords + ([mood] if mood else [])
+    
+    for kw in search_terms:
         query = query.filter(or_(
             Song.artist.ilike(f"%{kw}%"),
             Song.title.ilike(f"%{kw}%"),
@@ -332,9 +342,9 @@ def search_intent():
     
     # 2. Collaborative API Logic: If results are low, search Last.fm using Gemini's query
     ext_query = parsed_intent.get('external_search_query')
-    if (len(all_songs) < 5 or "drake" in intent.lower()) and ext_query:
+    if (len(all_songs) < 10 or "drake" in intent.lower()) and ext_query:
         client = LastFMClient(LASTFM_API_KEY)
-        external_results = client.search_track(ext_query, limit=10)
+        external_results = client.search_track(ext_query, limit=15)
         
         # Merge external results that aren't already in all_songs
         existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in all_songs)
