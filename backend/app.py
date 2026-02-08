@@ -75,6 +75,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# AUTOMATION: Create tables on startup for Render Free Tier (no shell access needed)
+with app.app_context():
+    try:
+        db.create_all()
+        print("Database tables created successfully!")
+    except Exception as e:
+        print(f"Error creating tables: {e}")
+
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({"error": "Internal Server Error", "details": str(error)}), 500
@@ -82,6 +90,16 @@ def internal_error(error):
 @app.errorhandler(404)
 def not_found_error(error):
     return jsonify({"error": "Not Found"}), 404
+
+# AUTOMATION: Endpoint to seed data via web request
+@app.route('/admin/seed_db')
+def seed_db_endpoint():
+    try:
+        from backend.seed_minimal import seed_minimal
+        seed_minimal()
+        return jsonify({"message": "Database seeded successfully!"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def serve_index():
