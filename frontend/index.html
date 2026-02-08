@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Discovery Engine</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
@@ -75,6 +75,21 @@
             <button id="search-btn">Discover My Undertone</button>
         </section>
 
+        <section class="glass-card" style="margin-top: 2rem;">
+            <h3>Import from Last.fm</h3>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Don't see what you want? Search
+                the global database to add it.</p>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <input type="text" id="external-search-input" placeholder="Search artist or song..."
+                    style="flex: 1; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: #fff;">
+                <button id="external-search-btn" style="width: auto; padding: 0 1.5rem; margin-top: 0;">Search
+                    Global</button>
+            </div>
+            <div id="external-results" class="results-grid">
+                <!-- External search results will appear here -->
+            </div>
+        </section>
+
         <main id="results" style="margin-top: 4rem;">
             <h2 id="results-title" style="display: none;">Discovered Tracks</h2>
             <div id="results-list">
@@ -83,7 +98,7 @@
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <script src="/script.js"></script>
 </body>
 
 </html>

@@ -75,6 +75,69 @@ async function saveToLibrary(songId) {
     }
 }
 
+// --- External Search Logic ---
+const externalSearchBtn = document.getElementById('external-search-btn');
+const externalSearchInput = document.getElementById('external-search-input');
+const externalResults = document.getElementById('external-results');
+
+if (externalSearchBtn) {
+    externalSearchBtn.addEventListener('click', async () => {
+        const query = externalSearchInput.value;
+        if (!query) return;
+
+        externalResults.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">Searching Last.fm...</div>';
+
+        try {
+            const response = await fetch(`/search/external?q=${encodeURIComponent(query)}`);
+            const tracks = await response.json();
+
+            externalResults.innerHTML = '';
+            if (tracks.length === 0) {
+                externalResults.innerHTML = '<div style="grid-column: 1/-1; text-align: center;">No tracks found on Last.fm.</div>';
+                return;
+            }
+
+            tracks.forEach(track => {
+                const card = document.createElement('div');
+                card.className = 'glass-card song-card';
+                card.style.padding = '1rem';
+                card.innerHTML = `
+                    <h5 style="color: var(--accent-primary); margin-bottom: 0.2rem;">${track.title}</h5>
+                    <p style="font-size: 0.8rem; margin-bottom: 0.8rem;">${track.artist}</p>
+                    <button class="import-btn" onclick="importTrack('${track.artist.replace(/'/g, "\\'")}', '${track.title.replace(/'/g, "\\'")}')" 
+                            style="padding: 0.5rem; font-size: 0.8rem; background: var(--bg-input); border: 1px solid var(--accent-primary); color: var(--accent-primary);">
+                        Import to Undertone
+                    </button>
+                `;
+                externalResults.appendChild(card);
+            });
+        } catch (err) {
+            console.error(err);
+            externalResults.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff4d4d;">External search failed.</div>';
+        }
+    });
+}
+
+async function importTrack(artist, title) {
+    try {
+        const response = await fetch('/song/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artist, title })
+        });
+        const song = await response.json();
+        if (response.status === 201 || response.status === 200) {
+            alert(`"${song.title}" imported successfully!`);
+            // Optionally trigger a local search to show it
+        } else {
+            alert('Import failed: ' + (song.error || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Import failed.');
+    }
+}
+
 // Check auth status on load
 async function checkAuth() {
     const response = await fetch('/me');

@@ -24,6 +24,10 @@ class Song(db.Model):
     year = db.Column(db.Integer, nullable=False)
     mainstream_score = db.Column(db.Integer, nullable=False) # 0-100 scale
 
+    # Phase 12: Polish & Flagging
+    is_contradictory = db.Column(db.Boolean, default=False)
+    contradiction_reason = db.Column(db.String(255), nullable=True)
+
     tags = db.relationship('SongTag', backref='song', lazy=True)
 
     def to_dict(self):
@@ -36,6 +40,8 @@ class Song(db.Model):
             "genre": self.genre,
             "year": self.year,
             "mainstream_score": self.mainstream_score,
+            "is_contradictory": self.is_contradictory,
+            "contradiction_reason": self.contradiction_reason,
             "tags": [t.tag_name for t in self.tags]
         }
 

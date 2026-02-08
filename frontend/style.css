@@ -1,13 +1,46 @@
 :root {
-    --bg-deep: #0a0e1a;
-    --bg-card: rgba(22, 27, 46, 0.7);
-    --bg-input: rgba(255, 255, 255, 0.05);
+    --bg-deep: #050810;
+    --bg-card: rgba(15, 20, 35, 0.7);
+    --bg-input: rgba(255, 255, 255, 0.03);
     --accent-primary: #00d4ff;
     --accent-secondary: #7000ff;
+    --accent-glow: rgba(0, 212, 255, 0.3);
     --text-main: #f0f5fc;
-    --text-muted: #a0aec0;
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --text-muted: #8a9ab0;
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-bright: rgba(255, 255, 255, 0.15);
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes glowPulse {
+    0% {
+        box-shadow: 0 0 5px var(--accent-glow);
+    }
+
+    50% {
+        box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    100% {
+        box-shadow: 0 0 5px var(--accent-glow);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease forwards;
 }
 
 * {
@@ -18,7 +51,7 @@
 
 body {
     background-color: var(--bg-deep);
-    background-image: 
+    background-image:
         radial-gradient(at 0% 0%, rgba(112, 0, 255, 0.15) 0px, transparent 50%),
         radial-gradient(at 100% 100%, rgba(0, 212, 255, 0.1) 0px, transparent 50%);
     color: var(--text-main);
@@ -51,10 +84,12 @@ h1 {
     margin-bottom: 0.5rem;
     background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
-h2, h3 {
+h2,
+h3 {
     margin-bottom: 1rem;
     font-weight: 600;
 }
@@ -64,23 +99,50 @@ h2, h3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 1.5rem 0;
     margin-bottom: 3rem;
+    border-bottom: 1px solid var(--glass-border);
 }
 
-.nav a, .nav strong {
-    color: var(--text-main);
+.nav-links {
+    display: flex;
+    gap: 2.5rem;
+    align-items: center;
+}
+
+.nav-links a,
+.nav-links strong {
     text-decoration: none;
-    font-weight: 500;
-    transition: color 0.3s ease;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: var(--transition-smooth);
+    position: relative;
+    cursor: pointer;
 }
 
-.nav a:hover {
+.nav-links strong {
     color: var(--accent-primary);
 }
 
-.nav strong {
-    border-bottom: 2px solid var(--accent-primary);
-    padding-bottom: 4px;
+.nav-links a:hover {
+    color: var(--text-main);
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--accent-primary);
+    transition: var(--transition-smooth);
+}
+
+.nav-links a:hover::after {
+    width: 100%;
 }
 
 /* Forms & Inputs */
@@ -105,7 +167,8 @@ label {
     letter-spacing: 0.05em;
 }
 
-select, input {
+select,
+input {
     background: var(--bg-input);
     border: 1px solid var(--glass-border);
     color: var(--text-main);
@@ -115,7 +178,8 @@ select, input {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-select:focus, input:focus {
+select:focus,
+input:focus {
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
 }
@@ -136,7 +200,7 @@ button {
     transition: transform 0.2s ease, box-shadow 0.3s ease;
     width: 100%;
     font-size: 1rem;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 button:hover {
@@ -149,7 +213,10 @@ button:active {
 }
 
 /* Results Grid */
-#results-list, #library-list, #recommendations-list {
+#results-list,
+#library-list,
+#recommendations-list,
+.results-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
@@ -257,6 +324,7 @@ textarea {
     .container {
         padding: 1rem;
     }
+
     h1 {
         font-size: 1.8rem;
     }

@@ -5,8 +5,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertone - Profile & Library</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 6rem auto;
+            position: relative;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 4px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.8rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: var(--transition-smooth);
+        }
+
+        .auth-tab.active {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--accent-primary);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #auth-error {
+            color: #ff4d4d;
+            background: rgba(255, 77, 77, 0.1);
+            padding: 0.8rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            display: none;
+            border: 1px solid rgba(255, 77, 77, 0.2);
+            text-align: center;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border: none;
+            color: white;
+            padding: 1rem;
+            border-radius: 12px;
+            font-weight: 700;
+            width: 100%;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            box-shadow: 0 10px 25px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-logout {
+            background: rgba(255, 77, 77, 0.05);
+            border: 1px solid rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            font-size: 0.9rem;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 77, 77, 0.15);
+            border-color: #ff4d4d;
+        }
+    </style>
 </head>
 
 <body>
@@ -18,53 +109,69 @@
             </div>
         </nav>
 
-        <section id="auth-section" class="glass-card">
-            <div id="login-form">
+        <!-- Auth Section -->
+        <div id="auth-section" class="auth-container fade-in">
+            <div class="glass-card">
+                <div class="auth-tabs">
+                    <div class="auth-tab active" onclick="switchAuth('login')">Login</div>
+                    <div class="auth-tab" onclick="switchAuth('register')">Register</div>
+                </div>
+
                 <header style="text-align: center; margin-bottom: 2rem;">
-                    <h2>Join the Undertone</h2>
-                    <p style="color: var(--text-muted);">Access your library and personalized discovery.</p>
+                    <h2 id="auth-title">Welcome Back</h2>
+                    <p id="auth-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">Enter your credentials
+                        to continue.</p>
                 </header>
-                <div class="filter-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" placeholder="e.g. music_lover">
+
+                <div id="auth-error"></div>
+
+                <div class="input-group">
+                    <label>USERNAME</label>
+                    <input type="text" id="username" placeholder="music_connoisseur" style="width: 100%;">
                 </div>
-                <div class="filter-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="••••••••">
+                <div class="input-group">
+                    <label>PASSWORD</label>
+                    <input type="password" id="password" placeholder="••••••••" style="width: 100%;">
                 </div>
-                <button id="login-btn">Login</button>
-                <button id="register-btn"
-                    style="background: transparent; border: 1px solid var(--glass-border); margin-top: -0.5rem;">Create
-                    Account</button>
+
+                <button id="auth-submit-btn" class="btn-primary">Login to Undertone</button>
+            </div>
+        </div>
+
+        <!-- User Info Section (Logged In) -->
+        <div id="user-info-section" style="display: none;" class="fade-in">
+            <div class="glass-card"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4rem;">
+                <div>
+                    <h2 style="margin-bottom: 0.2rem;">Welcome back, <span id="display-username"
+                            style="color: var(--accent-primary);"></span></h2>
+                    <p style="color: var(--text-muted);">Your personalized musical landscape awaits.</p>
+                </div>
+                <button id="logout-btn" class="btn-logout">Logout</button>
             </div>
 
-            <div id="user-info" style="display: none; text-align: center;">
-                <h2>Welcome back, <span id="display-username" style="color: var(--accent-primary);"></span>!</h2>
-                <p style="color: var(--text-muted); margin-bottom: 2rem;">Manage your curated collection below.</p>
-                <button id="logout-btn"
-                    style="background: var(--bg-deep); border: 1px solid #ff4d4d; color: #ff4d4d;">Logout</button>
-            </div>
-        </section>
+            <section id="library-section">
+                <header style="margin-bottom: 2rem;">
+                    <h2>Your Collection</h2>
+                    <p style="color: var(--text-muted);">Tracks that matched your intent.</p>
+                </header>
+                <div id="library-list" class="results-grid">
+                    <!-- Saved songs will be injected here -->
+                </div>
 
-        <section id="library-section" style="display: none; margin-top: 4rem;">
-            <header style="margin-bottom: 2rem;">
-                <h2>My Personal Library</h2>
-                <p style="color: var(--text-muted);">Your saved tracks and personal ratings.</p>
-            </header>
-            <div id="library-list">
-                <!-- Saved songs will be injected here -->
-            </div>
+                <div style="height: 6rem;"></div>
 
-            <hr style="margin: 4rem 0; border: 0; border-top: 1px solid var(--glass-border);">
-
-            <header style="margin-bottom: 2rem;">
-                <h2>Recommended For You</h2>
-                <p style="color: var(--text-muted);">Based on your style profile and community tags.</p>
-            </header>
-            <div id="recommendations-list">
-                <!-- Recommendations will be injected here -->
-            </div>
-        </section>
+                <header style="margin-bottom: 2rem;">
+                    <h2
+                        style="background: linear-gradient(to right, #fff, var(--text-muted)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                        Resonating Recommendations</h2>
+                    <p style="color: var(--text-muted);">Discovery curated by your unique undertone profile.</p>
+                </header>
+                <div id="recommendations-list" class="results-grid">
+                    <!-- Recommendations will be injected here -->
+                </div>
+            </section>
+        </div>
     </div>
 
     <script src="/profile.js"></script>

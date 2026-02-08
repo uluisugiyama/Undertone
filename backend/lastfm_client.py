@@ -81,3 +81,21 @@ class LastFMClient:
         except Exception as e:
             print(f"Error fetching top tracks for tag {tag}: {e}")
             return []
+
+    def search_track(self, query, limit=10):
+        params = {
+            "method": "track.search",
+            "track": query,
+            "api_key": self.api_key,
+            "format": "json",
+            "limit": limit
+        }
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            tracks = data.get('results', {}).get('trackmatches', {}).get('track', [])
+            return [{"artist": t['artist'], "title": t['name']} for t in tracks]
+        except Exception as e:
+            print(f"Error searching for track {query}: {e}")
+            return []

@@ -5,11 +5,23 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, Song, User, UserLibrary, UserRating, PersonalTrending
 from music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
+import random
+import math
 from datetime import datetime
+from lastfm_client import LastFMClient
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.secret_key = 'undertone-secret-key-poc' # Change this in production
 CORS(app, supports_credentials=True)
+
+LASTFM_API_KEY = "3f37633189fe9607a8eb374c727e5b65"
+
+def calculate_mainstream_score(listeners):
+    if listeners <= 0:
+        return 0
+    # Logarithmic scale: 10M listeners -> 100, 1M -> 86, 100k -> 71, 10k -> 57, 1k -> 43, 100 -> 28, 10 -> 14
+    score = int(math.log10(listeners) * 14.3)
+    return min(100, max(0, score))
 
 @app.route('/gui')
 def gui_index():
@@ -36,6 +48,62 @@ migrate = Migrate(app, db)
 def hello_world():
     return jsonify({"message": "Hello World! Undertone API is running."})
 
+# --- EXTERNAL API ENDPOINTS ---
+
+@app.route('/search/external')
+def search_external():
+    query = request.args.get('q')
+    if not query:
+        return jsonify([])
+    
+    client = LastFMClient(LASTFM_API_KEY)
+    results = client.search_track(query)
+    return jsonify(results)
+
+@app.route('/song/import', methods=['POST'])
+def import_song():
+    data = request.json
+    artist = data.get('artist')
+    title = data.get('title')
+    
+    if not artist or not title:
+        return jsonify({"error": "Artist and Title required"}), 400
+
+    # Check if exists
+    existing = Song.query.filter_by(artist=artist, title=title).first()
+    if existing:
+        return jsonify(existing.to_dict()), 200
+        
+    client = LastFMClient(LASTFM_API_KEY)
+    info = client.get_track_info(artist, title)
+    tags = client.get_track_tags(artist, title)
+    
+    # Create with enrichment
+    new_song = Song(
+        artist=artist,
+        title=title,
+        genre=tags[0]['name'].title() if tags else "Unknown",
+        bpm=random.randint(70, 160),
+        decibel_peak=round(random.uniform(-18.0, -8.0), 1),
+        year=2024,
+        mainstream_score=calculate_mainstream_score(info.get('listeners', 0))
+    )
+    db.session.add(new_song)
+    db.session.flush()
+    
+    from models import SongTag
+    for t in tags:
+        new_tag = SongTag(song_id=new_song.id, tag_name=t['name'], count=t['count'])
+        db.session.add(new_tag)
+        
+    db.session.commit()
+    return jsonify(new_song.to_dict()), 201
+
+@app.route('/admin/contradictions')
+def get_contradictions():
+    flagged = Song.query.filter_by(is_contradictory=True).all()
+    return jsonify([s.to_dict() for s in flagged])
+
 # --- AUTH ENDPOINTS ---
 
 @app.route('/register', methods=['POST'])
@@ -47,7 +115,7 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "User already exists"}), 400
     
-    hashed_pw = generate_password_hash(password)
+    hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
     new_user = User(username=username, password_hash=hashed_pw)
     db.session.add(new_user)
     db.session.commit()
