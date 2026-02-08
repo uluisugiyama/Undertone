@@ -562,8 +562,14 @@ def search_intent():
         Analyze the music search intent: "{intent}"
         {context_str}
         
-        1. Extract standard filters (artist, genre, mood).
+        1. Extract standard filters: 
+           - 'artist': The musician/group (e.g. "Radiohead").
+           - 'genres': List of musical genres (e.g. ["Rock", "Electronic"]).
+           - 'mood': Single descriptive mood (e.g. "Sad").
         2. Identify specific high-dimensional keywords (e.g. slow, atmospheric, energetic, lofi, melodic).
+        3. Create an 'external_search_query' for Last.fm lookup.
+        
+        CRITICAL: If the intent reflects a specific musical entity (like "Radiohead"), ensure it is in 'artist' NOT just 'keywords'.
         
         Return JSON:
         {{
@@ -633,6 +639,14 @@ def search_intent():
         query = query.filter(Song.artist.ilike(f"%{parsed_intent['artist']}%"))
     if parsed_intent.get('genres'):
         query = query.filter(or_(*[Song.genre.ilike(f"%{g}%") for g in parsed_intent['genres']]))
+        
+    # Metadata Safety Fallback: Search keywords in title/artist if they don't have vector dimensions
+    for kw in search_keywords:
+        if kw.lower() not in target_vector:
+            query = query.filter(or_(
+                Song.title.ilike(f"%{kw}%"),
+                Song.artist.ilike(f"%{kw}%")
+            ))
 
     # 3. High-Dimensional Scoring
     candidates = query.limit(250).all()
@@ -673,6 +687,39 @@ def search_intent():
     # 4. Sort and finalize
     all_songs.sort(key=lambda x: x['ranking_score'], reverse=True)
     
+    # 5. External Discovery (Last.fm Fallback)
+    ext_query = parsed_intent.get('external_search_query')
+    has_target_artist = False
+    if parsed_intent.get('artist'):
+        has_target_artist = any(parsed_intent['artist'].lower() in s['artist'].lower() for s in all_songs[:8])
+        
+    if (len(all_songs) < 5 or not has_target_artist) and ext_query and LASTFM_API_KEY:
+        try:
+            client = LastFMClient(LASTFM_API_KEY)
+            external_results = client.search_track(ext_query, limit=10)
+            
+            existing_keys = set(f"{s['artist'].lower()}|{s['title'].lower()}" for s in all_songs)
+            for res in external_results:
+                key = f"{res['artist'].lower()}|{res['title'].lower()}"
+                if key not in existing_keys:
+                    all_songs.append({
+                        "artist": res['artist'],
+                        "title": res['title'],
+                        "ai_recommendation": True,
+                        "genre": "External Discovery",
+                        "bpm": "Unknown",
+                        "decibel_peak": "Unknown",
+                        "sim_score": 0.5, # Mid-similarity for external
+                        "sim_reasoning": "Found via external discovery engine.",
+                        "ranking_score": 50 # Base score for external matches
+                    })
+                    existing_keys.add(key)
+        except Exception as e:
+            print(f"External discovery error: {e}")
+
+    # Re-sort to incorporate external results if needed
+    all_songs.sort(key=lambda x: x['ranking_score'], reverse=True)
+
     return jsonify({
         "songs": all_songs[:50],
         "search_log_id": new_log.id,
