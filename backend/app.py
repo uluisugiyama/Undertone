@@ -596,8 +596,66 @@ def search_intent():
     print(f"DEBUG: Filters Applied: {filters_applied}")
     print(f"DEBUG: Query SQL: {query}")
 
-    db_songs = query.limit(50).all()
-    all_songs = [s.to_dict() for s in db_songs]
+    # --- TWO-PASS SEARCH STRATEGY ---
+    # Pass 1: Strict Query (All filters applied)
+    db_songs_strict = query.limit(100).all()
+    
+    # Convert to dict and assign High Match Score
+    all_songs = []
+    found_ids = set()
+    
+    for s in db_songs_strict:
+        s_dict = s.to_dict()
+        s_dict['match_type'] = 'strict'
+        s_dict['base_score'] = 1000 # Ensure strict matches are always on top
+        all_songs.append(s_dict)
+        found_ids.add(s.id)
+        
+    # Pass 2: Relaxed Query (If results are low)
+    # Fetch partial matches if we have fewer than 50 results
+    if len(all_songs) < 50 and (parsed_intent.get('genres') or parsed_intent.get('mood') or parsed_intent.get('keywords')):
+        print(f"DEBUG: Triggering Relaxed Search. Found {len(all_songs)} strict matches.")
+        
+        relaxed_query = Song.query
+        
+        # Apply Mode Filter to relaxed query too
+        if mode == 'mainstream':
+            relaxed_query = relaxed_query.filter(Song.mainstream_score >= 70)
+        elif mode == 'niche':
+            relaxed_query = relaxed_query.filter(Song.mainstream_score < 70)
+            
+        # Broad "OR" Filter
+        conditions = []
+        
+        # 1. Genres
+        if parsed_intent.get('genres'):
+            for g in parsed_intent['genres']:
+                conditions.append(Song.genre.ilike(f"%{g}%"))
+                conditions.append(Song.tags.any(SongTag.tag_name.ilike(f"%{g}%")))
+        
+        # 2. Mood/Keywords
+        search_terms = parsed_intent.get('keywords', []) + ([parsed_intent['mood']] if parsed_intent.get('mood') else [])
+        for kw in search_terms:
+            conditions.append(Song.tags.any(SongTag.tag_name.ilike(f"%{kw}%"))) 
+            # Note: We exclude Artist/Title from relaxed generally to avoid noise, 
+            # unless the result count is VERY low. Let's keep it semantic.
+            
+        if conditions:
+            relaxed_query = relaxed_query.filter(or_(*conditions))
+            # Exclude already found
+            if found_ids:
+                relaxed_query = relaxed_query.filter(~Song.id.in_(found_ids))
+                
+            # Limit relaxed results
+            db_songs_relaxed = relaxed_query.limit(50 - len(all_songs)).all()
+            
+            for s in db_songs_relaxed:
+                s_dict = s.to_dict()
+                s_dict['match_type'] = 'relaxed'
+                s_dict['base_score'] = 0 # Baseline for partially matched
+                all_songs.append(s_dict)
+                
+    print(f"DEBUG: Total Songs Found: {len(all_songs)}")
     
     # 5. External Discovery
     ext_query = parsed_intent.get('external_search_query')
@@ -683,12 +741,12 @@ def search_intent():
                 else:
                     s['crowd_score'] = 0
 
-    all_songs.sort(key=lambda s: calculate_relevance(s) + (s.get('crowd_score', 0) * 0.5), reverse=True)
+    all_songs.sort(key=lambda s: s.get('base_score', 0) + calculate_relevance(s) + (s.get('crowd_score', 0) * 0.5), reverse=True)
 
     return jsonify({
-        "songs": all_songs[:20], 
+        "songs": all_songs,  # Returned full list (strict + relaxed)
         "search_log_id": new_log.id,
-        "parsed_intent": parsed_intent # Return for frontend feedback loop
+        "parsed_intent": parsed_intent 
     })
 
 @app.route('/songs/explore')
