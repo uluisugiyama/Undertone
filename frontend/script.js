@@ -61,6 +61,9 @@ document.querySelectorAll('.mode-chip').forEach(chip => {
     });
 });
 
+// Store current search context for feedback loop
+let currentFeedbackTags = [];
+
 document.getElementById('search-btn').addEventListener('click', async () => {
     const intent = document.getElementById('intent-input').value;
 
@@ -81,6 +84,17 @@ document.getElementById('search-btn').addEventListener('click', async () => {
         const songs = data.songs;
         const searchLogId = data.search_log_id;
 
+        // Capture feedback tags for this search session
+        if (data.parsed_intent) {
+            currentFeedbackTags = [
+                ...(data.parsed_intent.genres || []),
+                ...(data.parsed_intent.keywords || [])
+            ];
+            console.log("Current Search Context Tags:", currentFeedbackTags);
+        } else {
+            currentFeedbackTags = [];
+        }
+
         if (songs.length === 0) {
             resultsList.innerHTML = `<div class="glass-card" style="grid-column: 1/-1; text-align: center;">No matches found for this intent in ${currentMode} mode. Try switching discovery modes or broadening your intent.</div>`;
             return;
@@ -95,7 +109,13 @@ document.getElementById('search-btn').addEventListener('click', async () => {
 
 async function saveToLibrary(songId, searchLogId = null, artist = null, title = null) {
     try {
-        const payload = { song_id: songId, search_log_id: searchLogId };
+        const payload = {
+            song_id: songId,
+            search_log_id: searchLogId,
+            // PHASE 18: Send feedback tags to reinforce the search-result connection
+            feedback_tags: currentFeedbackTags
+        };
+
         if (!songId && artist && title) {
             payload.artist = artist;
             payload.title = title;

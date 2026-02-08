@@ -2,8 +2,8 @@ from flask import Flask, jsonify, request, session, send_from_directory
 from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_
-from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag, SearchLog
+from sqlalchemy import or_, and_
+from models import db, Song, User, UserLibrary, UserRating, PersonalTrending, SongTag, SearchLog, SongAnalysis
 from music_standards import is_fast_tempo, is_heavy, get_parent_genre
 import os
 import random
@@ -87,6 +87,51 @@ def search_external():
     results = client.search_track(query)
     return jsonify(results)
 
+def enrich_song_analysis(song):
+    """
+    Phase 19: Deep Music Analysis
+    Uses Gemini to infer 9-dimensional feature vectors.
+    """
+    prompt = f"""
+    Analyze the song "{song.title}" by "{song.artist}".
+    Provide a deep musicological analysis with the following metrics as JSON.
+    Strictly follow the JSON structure.
+    
+    {{
+      "tempo_feel": "slow" | "medium" | "fast",
+      "rhythmic_complexity": 0.0 to 1.0 (0=Simple 4/4, 1=Complex/Polyrythmic),
+      "vocal_style": "clean" | "raspy" | "screaming" | "fluid" | "instrumental",
+      "vocal_presence": 0.0 to 1.0 (0=Instrumental, 1=Vocal Dominant),
+      "dark_bright": 0.0 to 1.0 (0=Dark/Melancholic, 1=Bright/Happy),
+      "calm_energetic": 0.0 to 1.0 (0=Calm/Ambient, 1=High Energy/Aggressive),
+      "production_quality": 0.0 to 1.0 (0=Lo-fi/Raw, 1=Hi-fi/Polished),
+      "genre_distribution": {{ "GenreName": 0.X }} (Must sum roughly to 1.0)
+    }}
+    Return ONLY JSON.
+    """
+    
+    try:
+        response_text = call_gemini_api(prompt)
+        clean_response = response_text.replace('```json', '').replace('```', '').strip()
+        data = json.loads(clean_response)
+        
+        analysis = SongAnalysis(
+            song_id=song.id,
+            tempo_feel=data.get('tempo_feel', 'medium'),
+            rhythmic_complexity=float(data.get('rhythmic_complexity', 0.5)),
+            vocal_style=data.get('vocal_style', 'clean'),
+            vocal_presence=float(data.get('vocal_presence', 0.5)),
+            dark_bright=float(data.get('dark_bright', 0.5)),
+            calm_energetic=float(data.get('calm_energetic', 0.5)),
+            production_quality=float(data.get('production_quality', 0.8)),
+            genre_distribution=json.dumps(data.get('genre_distribution', {}))
+        )
+        db.session.add(analysis)
+        db.session.commit()
+        print(f"Deep Analysis complete for {song.title}")
+    except Exception as e:
+        print(f"Deep Analysis failed for {song.title}: {e}")
+
 def _perform_song_import(artist, title):
     # Check if exists
     existing = Song.query.filter_by(artist=artist, title=title).first()
@@ -113,6 +158,9 @@ def _perform_song_import(artist, title):
     for t in tags:
         new_tag = SongTag(song_id=new_song.id, tag_name=t['name'], count=t['count'])
         db.session.add(new_tag)
+        
+    # Phase 19: Deep Analysis
+    enrich_song_analysis(new_song)
         
     db.session.commit()
     return new_song
@@ -203,13 +251,16 @@ def save_to_library():
     if not song_id:
         return jsonify({"error": "Song ID or Artist/Title required"}), 400
 
-    if UserLibrary.query.filter_by(user_id=session['user_id'], song_id=song_id).first():
-        return jsonify({"message": "Song already in library"}), 200
-    
-    entry = UserLibrary(user_id=session['user_id'], song_id=song_id)
-    db.session.add(entry)
+    if not song_id:
+        return jsonify({"error": "Song ID or Artist/Title required"}), 400
 
-    # Phase 6: Search Success Logic
+    # Check existence
+    existing_entry = UserLibrary.query.filter_by(user_id=session['user_id'], song_id=song_id).first()
+    if not existing_entry:
+        entry = UserLibrary(user_id=session['user_id'], song_id=song_id)
+        db.session.add(entry)
+
+    # Phase 6: Search Success Logic (Log update)
     if search_log_id:
         log = SearchLog.query.get(search_log_id)
         if log:
@@ -225,6 +276,31 @@ def save_to_library():
         trending = PersonalTrending(user_id=session['user_id'], song_id=song_id)
         db.session.add(trending)
         
+    # PHASE 18: FEEDBACK LOOP
+    # If the frontend sends feedback tags (from the search intent that led to this save),
+    # increment them to reinforce the connection.
+    feedback_tags = data.get('feedback_tags', [])
+    if feedback_tags:
+        for t_name in feedback_tags:
+            t_name = t_name.strip()
+            if not t_name: continue
+            
+            # Find or create tag for this song
+            tag = SongTag.query.filter(
+                SongTag.song_id == song_id, 
+                SongTag.tag_name.ilike(t_name)
+            ).first()
+            
+            if tag:
+                tag.count += 1
+                print(f"DEBUG: Incremented tag '{t_name}' for song {song_id} to {tag.count}")
+            else:
+                # Only add new tags if they seem legitimate (basic length check for now)
+                if len(t_name) < 30:
+                    new_tag = SongTag(song_id=song_id, tag_name=t_name.title(), count=1)
+                    db.session.add(new_tag)
+                    print(f"DEBUG: Created new Crowd Tag '{t_name}' for song {song_id}")
+
     db.session.commit()
     return jsonify({"message": "Song saved to library"}), 201
 
@@ -302,6 +378,26 @@ def search_intent():
     if not intent:
         return jsonify([])
 
+    # DEBUG: Support Mock JSON for verification without API
+    if intent.startswith("MOCK_JSON:"):
+        try:
+            parsed_intent = json.loads(intent[10:])
+            print(f"DEBUG: Using Mock Intent: {parsed_intent}")
+            # Skip Gemini and Profile context
+            # We need to ensure variables are set or logic flow works
+            user_id = session.get('user_id')
+            user_profile = _get_user_profile(user_id) if user_id else {"top_tags": [], "fav_genre": None}
+            # Skip to filtering logic...
+            # We need to wrap the Gemini call in an if/else or reorganize
+            # Let's handle this by setting a flag or just bypassing the Gemini block below
+            # But the Gemini block is large.
+            # Best: set parsed_intent here and wrap Gemini block in "if not parsed_intent:"
+        except Exception as e:
+            print(f"Mock JSON error: {e}")
+            return jsonify([])
+    else:
+        parsed_intent = None
+
     # 1. Fetch User Profile for Implicit Personalization
     user_id = session.get('user_id')
     user_profile = _get_user_profile(user_id) if user_id else {"top_tags": [], "fav_genre": None}
@@ -310,51 +406,73 @@ def search_intent():
     if user_profile['top_tags']:
         context_str = f"\nUser Preferences Context: Favorite Genres: {user_profile['fav_genre']}, Top Vibe Tags: {', '.join(user_profile['top_tags'][:8])}"
 
-    # 2. Use Gemini to parse intent into structured filters
-    prompt = f"""
-    Analyze the following music search intent: "{intent}"
-    {context_str}
-    
-    Return a JSON object with:
-    - artist (string or null) -> Extract the primary artist if mentioned.
-    - genres (list of strings: e.g. ["rock", "pop"]) -> Be explicit about genres.
-    - mood (string: e.g. "sad", "energetic", "chill" or null)
-    - year_start (int or null)
-    - year_end (int or null)
-    - tempo (string: 'slow', 'medium', 'fast' or null)
-    - keywords (list of strings for search, including instruments or vibes)
-    - external_search_query (MANDATORY: A string optimized for Last.fm. If user context is provided and intent is broad, bias results towards user-preferred subgenres. E.g. "slow indie rock" if they like rock and chill vibes.)
-    
-    Return ONLY JSON.
-    """
-    
-    try:
-        response_text = call_gemini_api(prompt)
-        # Clean potential markdown from response
-        clean_response = response_text.replace('```json', '').replace('```', '').strip()
-        parsed_intent = json.loads(clean_response)
-        print(f"DEBUG PARSED INTENT: {parsed_intent}")
-    except Exception as e:
-        print(f"Gemini error: {e}")
-        # Intelligent Fallback: Try to detect genre keywords if API fails
-        fallback_genres = []
-        normalized = intent.lower()
-        common_genres = ['rock', 'pop', 'hip hop', 'rap', 'jazz', 'blues', 'country', 'metal', 'classical', 'electronic', 'dance', 'indie', 'r&b', 'soul', 'folk', 'punk']
+    # 2. Use Gemini to parse intent into structured filters AND deep feature vectors
+    if not parsed_intent:
+        prompt = f"""
+        Analyze the music search intent: "{intent}"
+        {context_str}
         
-        for g in common_genres:
-            if g in normalized:
-                fallback_genres.append(g.title())
+        1. Extract standard filters (artist, genre, mood).
+        2. Map vague descriptors to specific 9-dimensional feature constraints.
+           - tempo_feel: slow, medium, fast
+           - rhythmic_complexity: 0.0-1.0
+           - vocal_style: clean, raspy, screaming, fluid, instrumental
+           - vocal_presence: 0.0-1.0
+           - dark_bright: 0.0-1.0
+           - calm_energetic: 0.0-1.0
+           - production_quality: 0.0-1.0
         
-        parsed_intent = {
-            "artist": None, 
-            "genres": fallback_genres, 
-            "mood": None, 
-            "year_start": None, 
-            "year_end": None, 
-            "tempo": None, 
-            "keywords": [], 
-            "external_search_query": intent
-        }
+        Return JSON:
+        {{
+          "artist": null,
+          "genres": [],
+          "mood": null,
+          "year_start": null, 
+          "year_end": null,
+          "tempo": null,
+          "keywords": [],
+          "external_search_query": "...",
+          "feature_constraints": [
+              {{"feature": "dark_bright", "min": 0.0, "max": 0.3}},
+              {{"feature": "vocal_style", "values": ["screaming", "raspy"]}}
+          ] 
+        }}
+        """
+        
+        try:
+            response_text = call_gemini_api(prompt)
+            clean_response = response_text.replace('```json', '').replace('```', '').strip()
+            parsed_intent = json.loads(clean_response)
+            print(f"DEBUG PARSED INTENT: {parsed_intent}")
+        except Exception as e:
+            print(f"Gemini error: {e}")
+            # Intelligent Fallback
+            fallback_genres = []
+            normalized = intent.lower()
+            common_genres = ['rock', 'pop', 'hip hop', 'rap', 'jazz', 'blues', 'country', 'metal', 'classical', 'electronic', 'dance', 'indie', 'r&b', 'soul', 'folk', 'punk']
+            
+            for g in common_genres:
+                if g in normalized:
+                    fallback_genres.append(g.title())
+                    
+            # Fallback Tempo Detection
+            fallback_tempo = None
+            if 'slow' in normalized or 'chill' in normalized or 'down' in normalized or 'ballad' in normalized:
+                fallback_tempo = 'slow'
+            elif 'fast' in normalized or 'up' in normalized or 'energetic' in normalized or 'punk' in normalized:
+                fallback_tempo = 'fast'
+            
+            parsed_intent = {
+                "artist": None, 
+                "genres": fallback_genres, 
+                "mood": None, 
+                "year_start": None, 
+                "year_end": None, 
+                "tempo": fallback_tempo, 
+                "keywords": [], 
+                "external_search_query": intent,
+                "feature_constraints": [] 
+            }
 
     # Phase 6: Log Intent
     new_log = SearchLog(
@@ -365,6 +483,15 @@ def search_intent():
     db.session.add(new_log)
     db.session.commit()
     
+    # SAFETY NET: If AI missed the tempo but the user explicitly stated it, override.
+    # SKIP for Mock JSON (debug) to avoid self-triggering on JSON keys
+    if not parsed_intent.get('tempo') and not intent.startswith("MOCK_JSON:"):
+        normalized = intent.lower()
+        if 'slow' in normalized or 'chill' in normalized or 'down' in normalized or 'ballad' in normalized:
+            parsed_intent['tempo'] = 'slow'
+        elif 'fast' in normalized or 'up' in normalized or 'energetic' in normalized or 'punk' in normalized:
+            parsed_intent['tempo'] = 'fast'
+            
     query = Song.query 
 
     # Apply Mode Filter
@@ -402,7 +529,13 @@ def search_intent():
     genres = parsed_intent.get('genres', [])
     if genres:
         genre_filters = [Song.genre.ilike(f"%{g}%") for g in genres]
-        query = query.filter(or_(*genre_filters))
+        
+        # PHASE 18: SUBJECTIVE CROWD WISDOM
+        # If a tag matches the genre key and has high consensus (count >= 3), treat it as a valid genre match.
+        # This allows a song metadata-ed as "Pop" to show up in "Rock" if 3+ users tagged it "Rock".
+        tag_filters = [Song.tags.any(and_(SongTag.tag_name.ilike(f"%{g}%"), SongTag.count >= 3)) for g in genres]
+        
+        query = query.filter(or_(*genre_filters, *tag_filters))
         filters_applied = True
 
     # 4. Keyword/Mood matching
@@ -423,14 +556,45 @@ def search_intent():
                 ) if kw.lower() not in ['rock', 'pop', 'jazz', 'lofi', 'metal'] else False
             ))
 
+    # PHASE 19: DEEP FEATURE VECTOR FILTERING
+    feature_constraints = parsed_intent.get('feature_constraints', [])
+    if feature_constraints:
+        print(f"DEBUG: Applying {len(feature_constraints)} Deep Feature Constraints")
+        # Explicitly join SongAnalysis for vector filtering
+        query = query.join(SongAnalysis)
+        filters_applied = True
+        
+        for constraint in feature_constraints:
+            feature = constraint.get('feature')
+            
+            # Numeric Range (min/max)
+            if 'min' in constraint or 'max' in constraint:
+                col = getattr(SongAnalysis, feature, None)
+                if col:
+                    if 'min' in constraint:
+                        query = query.filter(col >= constraint['min'])
+                    if 'max' in constraint:
+                        query = query.filter(col <= constraint['max'])
+            
+            # Categorical Values (Enum)
+            if 'values' in constraint:
+                col = getattr(SongAnalysis, feature, None)
+                if col:
+                    query = query.filter(col.in_(constraint['values']))
+
     # CRITICAL FIX: Fallback
     if not filters_applied and intent:
+        print("DEBUG: Fallback logic triggered!")
         query = query.filter(or_(
             Song.genre.ilike(f"%{intent}%"),
             Song.tags.any(SongTag.tag_name.ilike(f"%{intent}%")),
             Song.artist.ilike(f"%{intent}%"),
             Song.title.ilike(f"%{intent}%")
         ))
+        
+    print(f"DEBUG: Parsed Intent: {parsed_intent}")
+    print(f"DEBUG: Filters Applied: {filters_applied}")
+    print(f"DEBUG: Query SQL: {query}")
 
     db_songs = query.limit(50).all()
     all_songs = [s.to_dict() for s in db_songs]
@@ -459,26 +623,72 @@ def search_intent():
                 })
                 existing_keys.add(key)
 
-    # 6. RE-RANKING FOR PERSONALIZATION
+    # 6. RE-RANKING FOR PERSONALIZATION & CROWD WISDOM
     def calculate_relevance(song_dict):
         score = 0
         # Boost if in user's favorite genre
-        if song_dict['genre'] == user_profile['fav_genre']:
+        if user_profile['fav_genre'] and song_dict['genre'] == user_profile['fav_genre']:
             score += 5
-        # Boost based on tag overlap
-        if 'tags' in song_dict: # If metadata is enriched
+            
+        # Boost based on tag overlap with User Profile
+        if 'tags' in song_dict: 
+            # 6a. Personal Profile Overlap
             overlap = set(user_profile['top_tags']).intersection(set(song_dict['tags']))
             score += len(overlap)
-        elif song_dict.get('ai_recommendation'): # If it's a raw external rec, less metadata
-            score += 1 # Base point for coming from Gemini's query
+            
+            # 6b. PHASE 18: CROWD WISDOM BOOST
+            # If the song has tags matching the current search intent, boost by their count/consensus
+            search_genres = [g.lower() for g in parsed_intent.get('genres', [])]
+            search_keywords = [k.lower() for k in parsed_intent.get('keywords', [])]
+            active_terms = set(search_genres + search_keywords)
+            
+            # We need to fetch the actual count from the DB for these specific tags
+            # Since song_dict['tags'] is just a list of strings, we query the count efficiently
+            # Optimization: We already loaded tags in to_dict, but not counts.
+            # To avoid N+1 queries during sorting, we rely on a heuristic or pre-fetch.
+            # For POC, we'll do a lightweight check if we are in a loop (mostly fine for 50 items)
+            # OR better: The query above selected songs. We trust the sort.
+            pass 
+
+        elif song_dict.get('ai_recommendation'):
+            score += 1 
             
         return score
 
-    all_songs.sort(key=calculate_relevance, reverse=True)
+    # Optimized Crowd Wisdom Sort:
+    # Fetch Counts for relevant tags for these 50 songs in one go? 
+    # Or just iterate. define helper.
+    
+    song_ids = [s['id'] for s in all_songs if 'id' in s]
+    if song_ids:
+        # Get all tags for these songs that match current intent
+        relevant_terms = [t.lower() for t in (parsed_intent.get('genres', []) + parsed_intent.get('keywords', []))]
+        if relevant_terms:
+            boosts = {} # {song_id: total_count_boost}
+            # Select sum of counts where tag_name in terms
+            rows = db.session.query(SongTag.song_id, db.func.sum(SongTag.count)).filter(
+                SongTag.song_id.in_(song_ids),
+                SongTag.tag_name.in_(relevant_terms)
+            ).group_by(SongTag.song_id).all()
+            
+            for sid, count_sum in rows:
+                boosts[sid] = count_sum if count_sum else 0
+                
+            # Update scores
+            for s in all_songs:
+                if s.get('id') in boosts:
+                    # Logarithmic boost to prevent one super-tag dominating? 
+                    # No, linear is fine for "Crowd Wisdom" - 50 people saying "Rock" should matter.
+                    s['crowd_score'] = boosts[s['id']]
+                else:
+                    s['crowd_score'] = 0
+
+    all_songs.sort(key=lambda s: calculate_relevance(s) + (s.get('crowd_score', 0) * 0.5), reverse=True)
 
     return jsonify({
-        "songs": all_songs[:20], # Return top 20 re-ranked
-        "search_log_id": new_log.id
+        "songs": all_songs[:20], 
+        "search_log_id": new_log.id,
+        "parsed_intent": parsed_intent # Return for frontend feedback loop
     })
 
 @app.route('/songs/explore')

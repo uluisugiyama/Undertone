@@ -84,3 +84,28 @@ class SearchLog(db.Model):
     selected_song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=True)
     mode = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SongAnalysis(db.Model):
+    __tablename__ = 'song_analysis'
+    id = db.Column(db.Integer, primary_key=True)
+    song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=False)
+    
+    # Tempo & Rhythm
+    tempo_feel = db.Column(db.String(50)) # slow, medium, fast
+    rhythmic_complexity = db.Column(db.Float) # 0.0 - 1.0 (Simple 4/4 -> Math Rock)
+    
+    # Vocals
+    vocal_style = db.Column(db.String(50)) # clean, raspy, screaming, fluid, instrumental
+    vocal_presence = db.Column(db.Float) # 0.0 (Instrumental) - 1.0 (Vocal dominant)
+    
+    # Mood & Emotion
+    dark_bright = db.Column(db.Float) # 0.0 (Dark/Melancholic) - 1.0 (Bright/Happy)
+    calm_energetic = db.Column(db.Float) # 0.0 (Chill) - 1.0 (High Energy)
+    
+    # Texture & Production
+    production_quality = db.Column(db.Float) # 0.0 (Lo-fi/Raw) - 1.0 (Polished/Hifi)
+    
+    # Genre Blending (Stored as JSON string)
+    genre_distribution = db.Column(db.Text) # e.g. {"Rock": 0.7, "Pop": 0.3}
+    
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
