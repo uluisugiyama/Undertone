@@ -261,3 +261,40 @@ button:hover {
         border: none;
     }
 }
+
+/* Rating Systems */
+.rating-stars {
+    display: flex;
+    gap: 5px;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.star {
+    cursor: pointer;
+    color: #cbd5e0;
+    /* Grayed out */
+    transition: var(--transition-fast);
+}
+
+.star.active {
+    color: var(--accent-red);
+}
+
+.star:hover {
+    transform: scale(1.2);
+}
+
+textarea {
+    width: 100%;
+    border: var(--border-thin);
+    padding: 1rem;
+    font-family: var(--font-sans);
+    margin-top: 1rem;
+    resize: vertical;
+    outline: none;
+}
+
+textarea:focus {
+    border-color: var(--accent-red);
+}

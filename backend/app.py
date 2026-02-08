@@ -775,24 +775,41 @@ def explore_songs():
     return jsonify([s.to_dict() for s in songs])
 
 def _get_user_profile(user_id):
-    """Refined helper to get top tags and genres for a user based on high ratings."""
-    high_ratings = UserRating.query.filter(UserRating.user_id == user_id, UserRating.rating >= 4).all()
-    if not high_ratings:
+    """
+    Refined helper to get top tags and genres for a user.
+    Now considers both explicit ratings AND implicit library Saves.
+    """
+    # 1. Get library songs and their ratings (if any)
+    library_entries = UserLibrary.query.filter_by(user_id=user_id).all()
+    if not library_entries:
         return {"top_tags": [], "fav_genre": None}
+        
+    ratings = {r.song_id: r.rating for r in UserRating.query.filter_by(user_id=user_id).all()}
     
-    liked_song_ids = [r.song_id for r in high_ratings]
     tag_counts = {}
     genre_counts = {}
     
-    for song_id in liked_song_ids:
+    for entry in library_entries:
+        song_id = entry.song_id
         song = Song.query.get(song_id)
         if not song: continue
-        genre_counts[song.genre] = genre_counts.get(song.genre, 0) + 1
+        
+        # Determine weight: Rated songs use their rating, unrated library songs use a default of 4 (Strong Interest)
+        rating = ratings.get(song_id, 4)
+        
+        # Only count "Positive" signals (Rating 4-5 or unrated library entry)
+        if rating < 4:
+            continue
+            
+        # Standard weighting (4-5)
+        genre_counts[song.genre] = genre_counts.get(song.genre, 0) + rating
+        
         for t in song.tags:
             t_name = t.tag_name.lower()
-            if t_name == song.artist.lower() or t_name in song.artist.lower():
+            # Skip artist name tags as they don't help with vibe mixing
+            if song.artist and (t_name == song.artist.lower() or t_name in song.artist.lower()):
                 continue
-            tag_counts[t_name] = tag_counts.get(t_name, 0) + 1
+            tag_counts[t_name] = tag_counts.get(t_name, 0) + rating
             
     sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:15]
     top_tag_names = [t[0] for t in sorted_tags]

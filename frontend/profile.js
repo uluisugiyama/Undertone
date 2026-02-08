@@ -122,7 +122,7 @@ async function loadLibrary() {
             <div class="rating-stars" id="stars-${song.id}" data-value="${song.user_rating || 0}">
                 ${[1, 2, 3, 4, 5].map(i => `
                     <span class="star ${(song.user_rating >= i) ? 'active' : ''}" 
-                          onclick="rateSong(${song.id}, ${i})">★</span>
+                          onclick="rateSong(${song.id}, ${i})">${(song.user_rating >= i) ? '★' : '☆'}</span>
                 `).join('')}
             </div>
             <textarea id="comment-${song.id}" placeholder="Editorial notes...">${song.user_comment || ''}</textarea>
@@ -141,8 +141,10 @@ function rateSong(songId, rating) {
     stars.forEach((star, index) => {
         if (index < rating) {
             star.classList.add('active');
+            star.innerText = '★';
         } else {
             star.classList.remove('active');
+            star.innerText = '☆';
         }
     });
     starContainer.dataset.value = rating;
@@ -151,21 +153,43 @@ function rateSong(songId, rating) {
 async function saveRating(songId) {
     const rating = document.getElementById(`stars-${songId}`).dataset.value;
     const comment = document.getElementById(`comment-${songId}`).value;
+    const saveBtn = document.querySelector(`button[onclick="saveRating(${songId})"]`);
+    const originalText = saveBtn.innerText;
 
-    if (!rating) {
+    if (!rating || rating === '0') {
         alert('Please select a star rating first!');
         return;
     }
 
-    const response = await fetch('/song/rate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ song_id: songId, rating: parseInt(rating), comment })
-    });
-    const data = await response.json();
+    try {
+        saveBtn.innerText = 'SAVING...';
+        saveBtn.disabled = true;
 
-    // Smooth refresh of recommendations
-    loadRecommendations();
+        const response = await fetch('/song/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ song_id: songId, rating: parseInt(rating), comment })
+        });
+
+        if (response.ok) {
+            saveBtn.innerText = 'SAVED!';
+            setTimeout(() => {
+                saveBtn.innerText = originalText;
+                saveBtn.disabled = false;
+                loadLibrary(); // Refresh library to ensure card state is correct
+                loadRecommendations(); // Refresh recommendations based on new data
+            }, 800);
+        } else {
+            alert('Error saving rating.');
+            saveBtn.innerText = originalText;
+            saveBtn.disabled = false;
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Save failed.');
+        saveBtn.innerText = originalText;
+        saveBtn.disabled = false;
+    }
 }
 
 async function loadRecommendations() {
