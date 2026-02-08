@@ -199,7 +199,13 @@ class DiscoveryEngine:
                     else:
                         feature_match = 0.0
                 
-                # Exact Match
+                # Numeric Similarity for single values (fallback for vectors)
+                elif isinstance(target, (float, int)):
+                    # If it's a number, calculate distance-based match (0.1 tolerance for 100%)
+                    dist = abs(val - target)
+                    feature_match = max(0, 1.0 - (dist * 2))
+                    
+                # Exact Match (Strings/Other)
                 elif val == target:
                     feature_match = 1.0
             

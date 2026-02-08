@@ -819,6 +819,51 @@ def _get_user_profile(user_id):
     
     return {"top_tags": top_tag_names, "fav_genre": fav_genre}
 
+def _get_user_collection_vector(user_id):
+    """
+    Calculates the 'Centroid' (Average) musical profile of a user's library.
+    Each feature is averaged across all liked/saved songs.
+    """
+    library_entries = UserLibrary.query.filter_by(user_id=user_id).all()
+    if not library_entries:
+        return {}
+        
+    ratings = {r.song_id: r.rating for r in UserRating.query.filter_by(user_id=user_id).all()}
+    
+    feature_sums = {}
+    feature_counts = {}
+    
+    for entry in library_entries:
+        song_id = entry.song_id
+        analysis = SongAnalysis.query.filter_by(song_id=song_id).first()
+        if not analysis: continue
+        
+        rating = ratings.get(song_id, 4)
+        if rating < 4: continue # Only learn from positive signals
+        
+        # Profile numeric features
+        for field in [
+            'tempo_stability', 'percussive_density', 'syncopation', 'rhythmic_aggressiveness',
+            'groove_complexity', 'vocal_presence', 'vocal_instr_ratio', 'vocal_distortion',
+            'dark_bright', 'calm_energetic', 'harmonic_tension', 'chord_complexity',
+            'instrument_density', 'dynamic_range_compression', 'lyrical_narrative',
+            'lyrical_repetition', 'lyrical_density', 'structural_variation',
+            'analog_digital_feel', 'spatial_width', 'reverb_density', 'instrument_separation',
+            'sonic_uniqueness'
+        ]:
+            val = getattr(analysis, field, None)
+            if val is not None:
+                feature_sums[field] = feature_sums.get(field, 0) + val
+                feature_counts[field] = feature_counts.get(field, 0) + 1
+                
+    # Calculate Averages and wrap in lists for DiscoveryEngine compatibility
+    centroid_vector = {}
+    for field, total in feature_sums.items():
+        if feature_counts[field] > 0:
+            centroid_vector[field] = [total / feature_counts[field]]
+            
+    return centroid_vector
+
 @app.route('/recommendations')
 def get_recommendations():
     if 'user_id' not in session:
@@ -826,31 +871,39 @@ def get_recommendations():
     
     user_id = session['user_id']
     profile = _get_user_profile(user_id)
+    target_vector = _get_user_collection_vector(user_id)
     
-    if not profile['top_tags'] and not profile['fav_genre']:
+    if not profile['top_tags'] and not profile['fav_genre'] and not target_vector:
         return jsonify([])
     
     top_tag_names = profile['top_tags']
     fav_genre = profile['fav_genre']
     
-    # 3. Find other songs that share tags OR the favorite genre
+    # 3. Candidate Selection: Songs in database NOT in library
     user_library_ids = [entry.song_id for entry in UserLibrary.query.filter_by(user_id=user_id).all()]
-    potential_matches = Song.query.filter(Song.id.notin_(user_library_ids)).all()
+    potential_matches = Song.query.filter(Song.id.notin_(user_library_ids)).limit(200).all()
     
     scored_recs = []
     for song in potential_matches:
+        # A. Vector Similarity Score (Vibe Match)
+        analysis = SongAnalysis.query.filter_by(song_id=song.id).first()
+        sim_score, _ = DiscoveryEngine.calculate_similarity(analysis, target_vector)
+        
+        # B. Metadata/Tag Boosts
         song_tags = [t.tag_name.lower() for t in song.tags]
         tag_overlap = set(top_tag_names).intersection(set(song_tags))
+        tag_boost = len(tag_overlap) * 0.1 # 10% boost per shared tag
         
-        score = len(tag_overlap)
-        if song.genre == fav_genre:
-            score += 2 # Genre match is strong
-            
-        if score > 0:
+        genre_boost = 0.2 if song.genre == fav_genre else 0
+        
+        # Combined Match Score (0.0 - 1.0+)
+        final_match_score = sim_score + tag_boost + genre_boost
+        
+        if final_match_score > 0.4: # Only show decent matches
             song_dict = song.to_dict()
-            song_dict['match_score'] = score
+            song_dict['match_score'] = round(final_match_score * 10, 1) # Internal scale 1-10
             # Add a small random jitter to break ties and keep UI fresh
-            song_dict['_sort_key'] = score + (random.random() * 0.1)
+            song_dict['_sort_key'] = final_match_score + (random.random() * 0.05)
             scored_recs.append(song_dict)
             
     # 4. Diversity Filter: Sort and then limit per artist
